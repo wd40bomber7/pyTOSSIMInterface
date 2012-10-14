@@ -85,7 +85,8 @@ class MainWindow(wx.Frame):
         self.simulationMenu.AppendSeparator()
 
         self.startButton = self.AddMenuItem(self.simulationMenu, "Start", self.__OnSimulationStart)
-        self.stopButton = self.AddMenuItem(self.simulationMenu, "Stop", self.__OnSimulationStart)
+        self.startButton = self.AddMenuItem(self.simulationMenu, "Pause", self.__OnSimulationPause)
+        self.stopButton = self.AddMenuItem(self.simulationMenu, "Stop", self.__OnSimulationStop)
         self.stopButton.Enable(False)
 
         
@@ -172,7 +173,10 @@ class MainWindow(wx.Frame):
         '''
         stub
         '''
-        
+    def __OnSimulationPause(self, event):
+        '''
+        stub
+        '''       
     def __OnSimulationStop(self, event):
         '''
         stub

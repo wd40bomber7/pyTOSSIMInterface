@@ -14,6 +14,7 @@ class SimOptions(object):
     This class stores the options that control the basic paramaters of the simulation
     '''
     def __init__(self):
+        self.autolearnChannels = True
         self.childPythonName = ""
         self.channelList = list()
         self.opsPerSecond = 10000000
@@ -126,7 +127,7 @@ class SimPresets(object):
         self.configPresets = list() #List of all SimOptions stored presets
         
         self.lastTopoFile = "";
-        self.lastSimulationOptions = None;
+        self.lastSimulationOptions = SimOptions();
     
 class SimQueues(object):
     '''
@@ -230,7 +231,7 @@ class Sim(object):
             self.savedPresets = SimPresets()
             return #preset file corrupt
         presetFile.close()
-
+        self.selectedOptions = self.savedPresets.lastSimulationOptions
         
     def SavePresets(self):
         try:
@@ -238,6 +239,7 @@ class Sim(object):
         except:
             return #Uhm? Error TODO:Make this error actually create a modal dialog or something
         
+        self.savedPresets.lastSimulationOptions = self.selectedOptions
         pickle.dump(self.savedPresets,presetFile,-1)
         
         presetFile.close()
