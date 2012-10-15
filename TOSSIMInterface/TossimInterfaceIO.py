@@ -60,10 +60,13 @@ class InterfaceIO(object):
             else:
                 sleepTime = max(1.0/100.0,sleepTime/1.3)
                 for line in lines:
-                    try:
-                        self.sim.simulationState.messages.ParseAndAppend(line);
-                    except:
-                        print "Malformed message[" + line + "]";
+                    if line[0] != "_":
+                        try:
+                            self.sim.simulationState.messages.ParseAndAppend(line);
+                        except:
+                            print "Malformed message[" + line + "]";
+                    else:
+                        self.sim.simulationState.ioQueues.QueueCommand()
                     
                     
             time.sleep(sleepTime)        

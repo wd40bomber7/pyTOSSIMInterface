@@ -6,9 +6,11 @@ Created on Oct 12, 2012
 
 import wx
 import os.path
-import subprocess
+import time
 import base64
 import StringIO
+import Simulation
+import TossimInterfaceIO
 #Windows to open
 
 class MainWindow(wx.Frame):
@@ -112,19 +114,79 @@ class MainWindow(wx.Frame):
         self.sim.openWindows.remove(self);
         self.Destroy();
         
-        
+    def __WaitForCommand(self):
+        start = time.clock();
+        while (time.clock() - start) < 15: #Wait 15 seconds. No longer
+            cmds = self.sim.simulationState.ioQueues.LiquidateCommandQueue();
+            if len(cmds) > 0:
+                return cmds[0];
+            time.sleep(.1)
+        return "";
     def __OnSimulationStart(self, event):
         if len(self.sim.selectedOptions.childPythonName) <= 0:
             self.displayError("You must set a python file to run in the config window.")
+            return
+        if len(self.sim.selectedOptions.topoFileName) <= 0:
+            self.displayError("You must set a topo file to run in the config window.")
+            return
+        if len(self.sim.selectedOptions.noiseFileName) <= 0:
+            self.displayError("You must set a noise file to run in the config window.")
+            return
+            
+        if self.sim.simulationState.simIsRunning:
+            return;
+        try:
+            self.sim.simulationState.currentTopo = Simulation.SimTopo(self.sim.selectedOptions.topoFileName)
+        except:
+            self.displayError("Unable to load topo file.")
+            return
+            
+        nodeList = ""
+        for node in self.sim.simulationState.currentTopo.nodeDict:
+            nodeList += node + ","
+        channelList = ""
+        for channel in self.sim.selectedOptions.channelList:
+            channelList += node + ","
+
+        self.sim.simulationState.simIsRunning = True;
+        try:
+            self.sim.simulationState.ioReadWrite = TossimInterfaceIO.InterfaceIO(self.sim,self.sim.selectedOptions.childPythonName)
+        except:
+            self.sim.simulationState.ioReadWrite = None
+            self.displayError("Unable to run program. Verify that the correct path is entered.")
+            return
+        self.sim.simulationState.ioQueues.QueueOutput("Nodelist " + nodeList[:-1])
+        self.sim.simulationState.ioQueues.QueueOutput("Channellist " + channelList[:-1])
+        self.sim.simulationState.ioQueues.QueueOutput("Settopo " + self.sim.selectedOptions.topoFileName)
+        if self.__WaitForCommand() != "_topoloaded success":
+            self.sim.simulationState.ioReadWrite.StopThreads()
+            self.sim.simulationState.ioReadWrite = None
+            self.sim.simulationState.simIsRunning = False;
+            self.displayError("Target was unable to load topo file. Make sure directory is not relative.");
+        self.sim.simulationState.ioQueues.QueueOutput("Setnoise " + self.sim.selectedOptions.noiseFileName)
+        if self.__WaitForCommand() != "_noiseloaded success":
+            self.sim.simulationState.ioReadWrite.StopThreads()
+            self.sim.simulationState.ioReadWrite = None
+            self.sim.simulationState.simIsRunning = False;
+            self.displayError("Target was unable to load noise file. Make sure directory is not relative.");
+        self.sim.simulationState.ioQueues.QueueOutput("Startsimulation")
+        for window in self.sim.openWindows:
+            window.RebuildMenus()
         
     def __OnSimulationPause(self, event):
-        '''
-        stub
-        '''       
+        self.sim.simulationState.ioQueues.QueueOutput("Pausesimulation")
+        self.sim.simulationState.simIsPaused = not self.sim.simulationState.simIsPaused
+        for window in self.sim.openWindows:
+            window.RebuildMenus()
+        
     def __OnSimulationStop(self, event):
-        '''
-        stub
-        '''
+        self.sim.simulationState.ioQueues.QueueOutput("Stopsimulation")
+        self.sim.simulationState.simIsPaused= False
+        self.sim.simulationState.simIsRunning = False;
+        self.sim.simulationState.ioReadWrite.StopThreads()
+        self.sim.simulationState.ioReadWrite = None
+        for window in self.sim.openWindows:
+            window.RebuildMenus()
     #For the windows menu
     def __OnShowOptions(self, event):
         for window in self.sim.openWindows:

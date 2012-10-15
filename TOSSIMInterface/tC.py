@@ -50,7 +50,7 @@ while True:
                 str1 = line.strip()
                 if str1:
                     val = int(str1)
-                    for i in range(1, len(nodeList)):
+                    for i in nodeList:
                         t.getNode(i).addNoiseTraceReading(val)
         except:
             print "_noiseloaded failure"
@@ -60,7 +60,9 @@ while True:
         sys.stdout.flush()
         noiseLoaded = True
     elif cmd[0] == "Nodelist":
-        nodeList = cmd[1].rsplit(",")
+        nodes = cmd[1].rsplit(",")
+        for n in nodes:
+            nodeList.append(int(n))
         nodesLoaded = True
     elif cmd[0] == "Channellist":
         channelList = cmd[1].rsplit(",")
@@ -75,10 +77,10 @@ if (not topoLoaded) or (not noiseLoaded) or (not nodesLoaded) or (not channelsLo
     sys.stdout.flush()
     sys.exit(1)
     
-for i in range(1, len(nodeList)):
+for i in nodeList:
     t.getNode(i).createNoiseModel()
 
-for i in range(1, len(nodeList)):
+for i in nodeList:
     t.getNode(i).bootAtTime(1000 + i * 111);
     
 def package(string):
@@ -108,19 +110,23 @@ def sendCMD(string):
     run(10);
 
 simulationPaused = False
+simulationRunning = True
     
 def handleInput():
     global cmdBuffer
     global simulationPaused
+    global simulationRunning
     while True:
         oCmd = sys.stdin.readline().rstrip()
         cmd = oCmd.rsplit(" ")
         if cmd[0] == "Pausesimulation":
             simulationPaused = not simulationPaused;
         elif cmd[0] == "Stopsimulation":
-            sys.exit()
+            simulationRunning = False
+            simulationPaused = False
+            return
         elif cmd[0] == "Injectpacket":
-            cmdBuffer.append(oCmd[13:])
+            cmdBuffer.append((int(cmd[1]),oCmd[len(cmd[0] + " " + cmd[1]):]))
         
     
 cmdBuffer = collections.deque();
@@ -140,9 +146,8 @@ pkt.setData(msg.data)
 pkt.setType(msg.get_amType())
 
 
-while True:
+while simulationRunning:
     run(2000)
-    
     cmdQueueProtection.acquire()
     while len(cmdBuffer) > 0:
         cmd = cmdBuffer.popleft()

@@ -100,12 +100,13 @@ class SimTopo(object):
         self.topoFileName = topoFile #the topo file this object represents
         #Exceptions passed up
         topoFile = open('presets.bin','r')
-        fileData = topoFile.readLines()
+        fileData = topoFile.readlines()
         topoFile.close()
         
         for line in fileData:
             parts = line.rsplit(" ")
-        
+            if len(parts) <= 0:
+                continue;
             fromNode = int(parts[0]);
             toNode = int(parts[1]);
             if not (fromNode in self.nodeDict):
@@ -139,7 +140,7 @@ class SimQueues(object):
         self.inputQueue = collections.deque()
         self.outputQueue = collections.deque()
         self.rawMessageQueue = collections.deque()
-        
+        self.cmdQueue = collections.deque()
         self.messagesDropped = 0
     
     def LiquidateInputQueue(self):
@@ -169,6 +170,15 @@ class SimQueues(object):
         self.queueLock.release();
         return liquidatedQueue
     
+    def LiquidateCommandQueue(self):
+        self.queueLock.acquire()
+        liquidatedQueue = list();
+        while len(self.cmdQueue) > 0:
+            liquidatedQueue.append(self.cmdQueue.popleft())
+        self.cmdQueue.clear()
+        self.queueLock.release();
+        return liquidatedQueue
+    
     def QueueInput(self, inputLine):
         self.queueLock.acquire()
         if len(self.inputQueue) >= 1000:
@@ -191,7 +201,15 @@ class SimQueues(object):
             self.rawMessageQueue.popleft();
             self.messagesDropped += 1;
         self.rawMessageQueue.append(rawMessageLine);
-        self.queueLock.release();     
+        self.queueLock.release();    
+        
+    def QueueCommand(self,cmd):
+        self.queueLock.acquire()
+        if len(self.cmdQueue) >= 1000:
+            self.cmdQueue.popleft();
+            self.messagesDropped += 1;
+        self.cmdQueue.append(cmd);
+        self.queueLock.release();    
     
 class SimState(object):
     '''
