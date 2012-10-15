@@ -91,6 +91,7 @@ class MessagePool(object):
                 continue
             if message.ContainsChannelFromList(allowedChannels):
                 filteredList.append(message);
+
         self.messagesLock.release()
         return (newReadPosition,filteredList)
         

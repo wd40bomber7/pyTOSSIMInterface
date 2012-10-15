@@ -125,9 +125,9 @@ class OutputWindow(PrimaryFrame.MainWindow):
             rendered += "[" + message.channelList[0] + "] "
         if self.displayNodeId:
             rendered += " (" + str(message.nodeId) + ") "
-        rendered = rendered[:-1] + ": " + message.messageText; #render color one day?
-        if len(self.displayedText) > 0:
-            rendered = "\n" + rendered
+        rendered = rendered[:-1] + ": " + message.messageText.rstrip(); #render color one day?
+        #if len(self.displayedText) > 0:
+            #rendered = "\n" + rendered
         
         self.displayedText += rendered
         if (message.messageType != MessageType.Debug):
@@ -139,21 +139,21 @@ class OutputWindow(PrimaryFrame.MainWindow):
             self.control.EndTextColour()
         
         
-    def AddMessage(self, message):
-        if not (message.messageType in self.selectedTypes):
-            return
-        if not (message.nodeId in self.selectedNodes):
-            return
-        if message.ContainsChannelFromList(self.selectedChannels):
-            self.__RenderMessage(message)
+
         
     def UpdateDisplay(self, event):
         newData = self.sim.simulationState.messages.RetrieveFilteredList(self.selectedTypes,self.selectedChannels,self.selectedNodes,self.readPosition)
+        #print "Updated display. [" + str(self.readPosition) + " -> " + str(newData[0]) + "]"
         self.readPosition = newData[0]
         for message in newData[1]:
-            self.AddMessage(message);
+            self.__RenderMessage(message);
         if self.channelCount != len(self.sim.selectedOptions.channelList):
             self.RebuildMenus()
+    def RebuildDisplay(self):
+	self.displayedText = ""
+	self.control.Value = ""
+        self.readPosition = 0
+        self.UpdateDisplay(None)
         
     def WindowType(self):
         return 1
@@ -165,6 +165,7 @@ class OutputWindow(PrimaryFrame.MainWindow):
         else:
             self.selectedTypes.append(MessageType.Debug)
         self.selectedPreset = None;
+	self.RebuildDisplay()
             
     def __OnTypeError(self, event):
         if MessageType.Error in self.selectedTypes:
@@ -172,6 +173,7 @@ class OutputWindow(PrimaryFrame.MainWindow):
         else:
             self.selectedTypes.append(MessageType.Error)
         self.selectedPreset = None;
+        self.RebuildDisplay()
             
     #For the channel Menu
     def __OnChannel(self, event):
@@ -181,14 +183,17 @@ class OutputWindow(PrimaryFrame.MainWindow):
         else:
             self.selectedChannels.append(channel)
         self.selectedPreset = None;
+        self.RebuildDisplay()
+        
     #For the nodes Menu
     def __OnNode(self, event):
         node = self.nodeDict[event.GetId()]
-        if node in self.selectedChannels:
-            self.selectedChannels.remove(node)
+        if node in self.selectedNodes:
+            self.selectedNodes.remove(node)
         else:
-            self.selectedChannels.append(node)
+            self.selectedNodes.append(node)
         self.selectedPreset = None;
+        self.RebuildDisplay()
     #For the display Menu
     def __OnDisplayNodeIDs(self, event):
         if self.displayNodeId:
@@ -196,18 +201,21 @@ class OutputWindow(PrimaryFrame.MainWindow):
         else:
             self.displayNodeId = True
         self.selectedPreset = None;
+        self.RebuildDisplay()
     def __OnDisplayChannels(self, event):
         if self.displayChannel:
             self.displayChannel = False
         else:
             self.displayChannel = True
         self.selectedPreset = None;
+        self.RebuildDisplay()
     def __OnDisplayTypes(self, event):
         if self.displayNodeId:
             self.displayNodeId = False
         else:
             self.displayNodeId = True
         self.selectedPreset = None;
+        self.RebuildDisplay()
     #For the presets Menu
     def __OnPreset(self, event):
         if self.selectedPreset != self.presetDict[event.GetId()]:
@@ -219,6 +227,7 @@ class OutputWindow(PrimaryFrame.MainWindow):
             self.displayNodeId = self.selectedPreset.displayNodeId;
             self.displayType = self.selectedPreset.displayType;
             self.RebuildMenus();
+	    self.RebuildDisplay()
     def __OnPresetRemove(self, event):  
         presetsList = list();
         presetsDict = dict();

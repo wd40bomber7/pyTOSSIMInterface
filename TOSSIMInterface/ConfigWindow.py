@@ -155,25 +155,31 @@ class ConfigWindow(PrimaryFrame.MainWindow):
         dlg = wx.FileDialog(
             self, message="Choose a file",
             wildcard="Python files (*.py)|*.py|All files (*.*)|*.*",
-            style=wx.OPEN| wx.CHANGE_DIR)
+            style=wx.OPEN)
         if dlg.ShowModal() == wx.ID_OK:
             self.pythonChildTextbox.Value = dlg.GetPath()
+            self.sim.selectedOptions.childPythonName = self.pythonChildTextbox.Value
+            self.sim.SavePresets()
         dlg.Destroy()
     def __OnTopoBrowse(self, event):
         dlg = wx.FileDialog(
             self, message="Choose a file",
             wildcard="Text files (*.txt)|*.txt|All files (*.*)|*.*",
-            style=wx.OPEN| wx.CHANGE_DIR)
+            style=wx.OPEN)
         if dlg.ShowModal() == wx.ID_OK:
             self.topoFileTextbox.Value = dlg.GetPath()
+            self.sim.selectedOptions.topoFileName = self.topoFileTextbox.Value
+            self.sim.SavePresets()
         dlg.Destroy()
     def __OnNoiseBrowse(self, event):
         dlg = wx.FileDialog(
             self, message="Choose a file",
             wildcard="Text files (*.txt)|*.txt|All files (*.*)|*.*",
-            style=wx.OPEN| wx.CHANGE_DIR)
+            style=wx.OPEN)
         if dlg.ShowModal() == wx.ID_OK:
             self.noiseFileTextbox.Value = dlg.GetPath()
+            self.sim.selectedOptions.noiseFileName = self.noiseFileTextbox.Value
+            self.sim.SavePresets()
         dlg.Destroy()
     #for the dialog
     def __OnPythonChildChange(self, event):

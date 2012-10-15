@@ -115,12 +115,13 @@ class MainWindow(wx.Frame):
         self.Destroy();
         
     def __WaitForCommand(self):
-        start = time.clock();
-        while (time.clock() - start) < 15: #Wait 15 seconds. No longer
+        start = time.time();
+        while (time.time() - start) < 3: #Wait 3 seconds. No longer
             cmds = self.sim.simulationState.ioQueues.LiquidateCommandQueue();
             if len(cmds) > 0:
                 return cmds[0];
             time.sleep(.1)
+        print "Command timed out"
         return "";
     def __OnSimulationStart(self, event):
         if len(self.sim.selectedOptions.childPythonName) <= 0:
@@ -143,10 +144,11 @@ class MainWindow(wx.Frame):
             
         nodeList = ""
         for node in self.sim.simulationState.currentTopo.nodeDict:
-            nodeList += node + ","
+            nodeList += str(node) + ","
+        print nodeList
         channelList = ""
         for channel in self.sim.selectedOptions.channelList:
-            channelList += node + ","
+            channelList += channel + ","
 
         self.sim.simulationState.simIsRunning = True;
         try:
@@ -163,12 +165,14 @@ class MainWindow(wx.Frame):
             self.sim.simulationState.ioReadWrite = None
             self.sim.simulationState.simIsRunning = False;
             self.displayError("Target was unable to load topo file. Make sure directory is not relative.");
+	    return;
         self.sim.simulationState.ioQueues.QueueOutput("Setnoise " + self.sim.selectedOptions.noiseFileName)
         if self.__WaitForCommand() != "_noiseloaded success":
             self.sim.simulationState.ioReadWrite.StopThreads()
             self.sim.simulationState.ioReadWrite = None
             self.sim.simulationState.simIsRunning = False;
             self.displayError("Target was unable to load noise file. Make sure directory is not relative.");
+	    return;
         self.sim.simulationState.ioQueues.QueueOutput("Startsimulation")
         for window in self.sim.openWindows:
             window.RebuildMenus()

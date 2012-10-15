@@ -8,6 +8,7 @@ from threading import Thread;
 import subprocess;
 import sys;
 import time;
+import os.path;
 
 class InterfaceIO(object):
     '''
@@ -21,15 +22,27 @@ class InterfaceIO(object):
         self.__runInputOutput = True
         self.sim = sim;
         
+        self.p = None;
+        
+        if not os.path.isfile(pythonToBind):
+            raise Exception("Unable to find file")
+        
+        print "Running cmd \"python" + pythonToBind + "\""
         self.p = subprocess.Popen(["python",pythonToBind],stdout=subprocess.PIPE,stdin=subprocess.PIPE)
+        
+        if self.p is None:
+            raise Exception("Unable to find file")
         
         self.__inputThread = Thread(None,self.__handleInput,None,())
         self.__outputThread = Thread(None,self.__handleOutput,None,())
+        self.__processThread = Thread(None,self.__processInput,None,())
         
-        self.__inputThread.daemon = True;
-        self.__outputThread.daemon = True;
+        self.__inputThread.daemon = True
+        self.__outputThread.daemon = True
+        self.__processThread.daemon = True
         self.__inputThread.start();
         self.__outputThread.start();
+        self.__processThread.start();
         
     def StopThreads(self):
         self.__runInputOutput = False;
@@ -38,7 +51,10 @@ class InterfaceIO(object):
     def __handleInput(self):
         while self.__runInputOutput and (not self.p.stdout.closed):
             line = self.p.stdout.readline()
+            if len(line) == 0:
+		break;
             self.sim.simulationState.ioQueues.QueueInput(line.rstrip());
+        print "stopped reading"
     def __handleOutput(self):
         while self.__runInputOutput and (not self.p.stdin.closed):
             try:
@@ -66,7 +82,7 @@ class InterfaceIO(object):
                         except:
                             print "Malformed message[" + line + "]";
                     else:
-                        self.sim.simulationState.ioQueues.QueueCommand()
+                        self.sim.simulationState.ioQueues.QueueCommand(line)
                     
                     
             time.sleep(sleepTime)        

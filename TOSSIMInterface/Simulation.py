@@ -8,6 +8,8 @@ import pickle
 import threading
 import collections
 import Messages
+import os
+import sys
 
 class SimOptions(object):
     '''
@@ -99,13 +101,13 @@ class SimTopo(object):
         
         self.topoFileName = topoFile #the topo file this object represents
         #Exceptions passed up
-        topoFile = open('presets.bin','r')
+        topoFile = open(topoFile,'r')
         fileData = topoFile.readlines()
         topoFile.close()
         
         for line in fileData:
-            parts = line.rsplit(" ")
-            if len(parts) <= 0:
+            parts = line.rstrip().rsplit(" ")
+            if len(parts) <= 1:
                 continue;
             fromNode = int(parts[0]);
             toNode = int(parts[1]);
@@ -255,6 +257,7 @@ class Sim(object):
         try:
             presetFile = open('presets.bin','wb')
         except:
+            print "Saving presets failed"
             return #Uhm? Error TODO:Make this error actually create a modal dialog or something
         
         self.savedPresets.lastSimulationOptions = self.selectedOptions
