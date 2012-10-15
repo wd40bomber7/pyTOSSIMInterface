@@ -16,6 +16,8 @@ class SimOptions(object):
     def __init__(self):
         self.autolearnChannels = True
         self.childPythonName = ""
+        self.topoFileName = ""
+        self.noiseFileName = ""
         self.channelList = list()
         self.opsPerSecond = 10000000
         self.name = ""
@@ -121,8 +123,6 @@ class SimPresets(object):
     ''' 
     
     def __init__(self):
-        self.topoFileNames = list() #list of recently used topo files
-        self.noiseFileNames = list() #list of recently used noise files
         self.outputPresets = list() #list of all saved output window presets
         self.configPresets = list() #List of all SimOptions stored presets
         
@@ -203,6 +203,7 @@ class SimState(object):
         self.ioReadWrite = None
         self.messages = Messages.MessagePool()
         self.simIsRunning = False
+        self.simIsPaused = False
         self.currentTopo = SimTopo();
     
     
@@ -223,7 +224,6 @@ class Sim(object):
             presetFile = open('presets.bin','rb')
         except:
             return #no preset file found. forget it
-        
         
         try:
             self.savedPresets = pickle.load(presetFile)

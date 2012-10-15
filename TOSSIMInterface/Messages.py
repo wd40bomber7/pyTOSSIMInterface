@@ -3,6 +3,8 @@ Created on Oct 12, 2012
 
 @author: wd40bomber7
 '''
+import threading
+import collections
 
 class MessageType(object):
     Error = 0;
@@ -43,7 +45,9 @@ class MessagePool(object):
         '''
         Constructor
         '''
-        __storedMessages = list();
+        self.messagesLock = threading.RLock()
+        self.__storedMessages = list(); #collections.deque();
+        #self.__bufferSlider = 0 #Used to fool outsiders into thinking a buffer has infinite depth when it's fixed depth
         
     def ParseAndAppend(self, unparsedMessage):
         message = Message();
@@ -67,18 +71,26 @@ class MessagePool(object):
         if len(cutup) > 3:
             message.messageText = unparsedMessage[len(cutup[0])+len(cutup[1])+len(cutup[2])+3:]
         
-        
+        self.messagesLock.acquire()
+        #due to buffer mechanic, it is currently infinitly large.
+        #if len(self.__storedMessages) >= 2000: #current max buffer
+            #self.__storedMessages.popleft();
         self.__storedMessages.append(message)
+        self.messagesLock.release()
+        return message
         
-    def RetrieveFilteredList(self,allowedTypes,allowedChannels,allowedNodes):
+    def RetrieveFilteredList(self,allowedTypes,allowedChannels,allowedNodes,readPosition=0):
         filteredList = list()
-        for message in self.__storedMessages:
+        self.messagesLock.acquire()
+        newReadPosition = len(self.__storedMessages)
+        for i in range(readPosition,newReadPosition) :
+            message = self.__storedMessages[i]
             if not (message.messageType in allowedTypes):
                 continue
             if not (message.nodeId in allowedNodes):
                 continue
             if message.ContainsChannelFromList(allowedChannels):
                 filteredList.append(message);
-        
-        return filteredList
+        self.messagesLock.release()
+        return (newReadPosition,filteredList)
         

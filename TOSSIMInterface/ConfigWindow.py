@@ -26,7 +26,7 @@ class ConfigWindow(PrimaryFrame.MainWindow):
 
 
         #setup
-        super(ConfigWindow,self).__init__(sim,"Output Window")
+        super(ConfigWindow,self).__init__(sim,"Config Window")
         #self.BackgroundColour()
         
         #Create menus
@@ -42,11 +42,43 @@ class ConfigWindow(PrimaryFrame.MainWindow):
         baseVSize = wx.BoxSizer(wx.VERTICAL)
         
         nameHSize = wx.BoxSizer(wx.HORIZONTAL)
-        label = wx.StaticText(self,wx.ID_ANY,"Child Python File: ")
+        label = wx.StaticText(self,wx.ID_ANY,"Python File: ")
         nameHSize.Add(label,0,wx.RIGHT, 8);
         self.pythonChildTextbox = wx.TextCtrl(self,wx.ID_ANY);
         self.Bind(wx.EVT_TEXT, self.__OnPythonChildChange, self.pythonChildTextbox)
         nameHSize.Add(self.pythonChildTextbox, 1)
+        nameHSize.AddSpacer(10,-1)
+        button = wx.Button(self,wx.ID_ANY,"Browse");
+        self.Bind(wx.EVT_BUTTON, self.__OnPythonBrowse, button)
+        nameHSize.Add(button,0,wx.RIGHT);
+        
+        baseVSize.AddSizer(nameHSize, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
+        baseVSize.AddSpacer(10,-1);
+        
+        nameHSize = wx.BoxSizer(wx.HORIZONTAL)
+        label = wx.StaticText(self,wx.ID_ANY,"Topo File: ")
+        nameHSize.Add(label,0,wx.RIGHT, 8);
+        self.topoFileTextbox = wx.TextCtrl(self,wx.ID_ANY);
+        self.Bind(wx.EVT_TEXT, self.__OnTopoFileChange, self.topoFileTextbox)
+        nameHSize.Add(self.topoFileTextbox, 1)
+        nameHSize.AddSpacer(10,-1)
+        button = wx.Button(self,wx.ID_ANY,"Browse");
+        self.Bind(wx.EVT_BUTTON, self.__OnTopoBrowse, button)
+        nameHSize.Add(button,0,wx.RIGHT);
+        
+        baseVSize.AddSizer(nameHSize, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
+        baseVSize.AddSpacer(10,-1);
+        
+        nameHSize = wx.BoxSizer(wx.HORIZONTAL)
+        label = wx.StaticText(self,wx.ID_ANY,"Noise File: ")
+        nameHSize.Add(label,0,wx.RIGHT, 8);
+        self.noiseFileTextbox = wx.TextCtrl(self,wx.ID_ANY);
+        self.Bind(wx.EVT_TEXT, self.__OnNoiseFileChange, self.noiseFileTextbox)
+        nameHSize.Add(self.noiseFileTextbox, 1)
+        nameHSize.AddSpacer(10,-1)
+        button = wx.Button(self,wx.ID_ANY,"Browse");
+        self.Bind(wx.EVT_BUTTON, self.__OnNoiseBrowse, button)
+        nameHSize.Add(button,0,wx.RIGHT);
         
         baseVSize.AddSizer(nameHSize, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
         baseVSize.AddSpacer(10,-1);
@@ -88,6 +120,8 @@ class ConfigWindow(PrimaryFrame.MainWindow):
         
     def UpdateDisplay(self):
         self.pythonChildTextbox.Value = self.sim.selectedOptions.childPythonName
+        self.noiseFileTextbox.Value = self.sim.selectedOptions.noiseFileName
+        self.topoFileTextbox.Value = self.sim.selectedOptions.topoFileName
         self.opCountTextbox.Value = str(self.sim.selectedOptions.opsPerSecond)
         self.autoLearnCheckbox.Value = self.sim.selectedOptions.autolearnChannels
         self.channelListBox.Set(self.sim.selectedOptions.channelList)
@@ -115,11 +149,43 @@ class ConfigWindow(PrimaryFrame.MainWindow):
     
         
     def WindowType(self):
-        return 1
-    
+        return 2
+    #browse buttons
+    def __OnPythonBrowse(self, event):
+        dlg = wx.FileDialog(
+            self, message="Choose a file",
+            wildcard="Python files (*.py)|*.py|All files (*.*)|*.*",
+            style=wx.OPEN| wx.CHANGE_DIR)
+        if dlg.ShowModal() == wx.ID_OK:
+            self.pythonChildTextbox.Value = dlg.GetPath()
+        dlg.Destroy()
+    def __OnTopoBrowse(self, event):
+        dlg = wx.FileDialog(
+            self, message="Choose a file",
+            wildcard="Text files (*.txt)|*.txt|All files (*.*)|*.*",
+            style=wx.OPEN| wx.CHANGE_DIR)
+        if dlg.ShowModal() == wx.ID_OK:
+            self.topoFileTextbox.Value = dlg.GetPath()
+        dlg.Destroy()
+    def __OnNoiseBrowse(self, event):
+        dlg = wx.FileDialog(
+            self, message="Choose a file",
+            wildcard="Text files (*.txt)|*.txt|All files (*.*)|*.*",
+            style=wx.OPEN| wx.CHANGE_DIR)
+        if dlg.ShowModal() == wx.ID_OK:
+            self.noiseFileTextbox.Value = dlg.GetPath()
+        dlg.Destroy()
     #for the dialog
     def __OnPythonChildChange(self, event):
         self.sim.selectedOptions.childPythonName = self.pythonChildTextbox.Value
+        self.sim.SavePresets()
+        
+    def __OnTopoFileChange(self, event):
+        self.sim.selectedOptions.topoFileName = self.topoFileTextbox.Value
+        self.sim.SavePresets()
+        
+    def __OnNoiseFileChange(self, event):
+        self.sim.selectedOptions.noiseFileName = self.noiseFileTextbox.Value
         self.sim.SavePresets()
         
     def __OnOpCountChange(self, event):

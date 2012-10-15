@@ -21,6 +21,7 @@ class OutputWindow(PrimaryFrame.MainWindow):
         Constructor
         '''
         #Variables
+        self.readPosition = 0; #the line in the list of all received lines this node is reading at
         self.selectedChannels = list();
         self.selectedTypes = list();
         self.selectedNodes = list();
@@ -30,26 +31,17 @@ class OutputWindow(PrimaryFrame.MainWindow):
         self.displayType = True;
         
         self.selectedPreset = None;
+        self.displayedText = ""
         
 
         #setup
         super(OutputWindow,self).__init__(sim,"Output Window")
         
-        r = wx.richtext.RichTextCtrl(self,style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_AUTO_SCROLL)
+        self.control = wx.richtext.RichTextCtrl(self,style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_AUTO_SCROLL)
         #r = wx.TextCtrl(self,style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_AUTO_SCROLL)
-        self.control = r;
-        #r.GetCaret().Hide();
-        r.BeginFontSize(12);
-        r.BeginTextColour(wx.Color(255,0,0))
+        self.control.BeginFontSize(12);
         self.Show(True);
         self.tester = 0
-        self.r = r
-        #for i in range(1,75):
-            #r.WriteText("test " + str(i));
-            #time.sleep(.25);
-        self.timer = wx.Timer(self)
-        self.Bind(wx.EVT_TIMER, self.Update, self.timer)
-        self.timer.Start(250);
         
         #Create menus
         self.typeMenu = wx.Menu()
@@ -72,23 +64,13 @@ class OutputWindow(PrimaryFrame.MainWindow):
         
         self.RebuildMenus()
         
+        self.timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.UpdateDisplay, self.timer)
+        self.timer.Start(250);
+        self.UpdateDisplay(None) #force initial update
+        
         self.Show();
         #now for a little color test
-    def Update(self, event):
-        if self.tester > 50:
-            self.timer.Stop();
-        self.tester+=1;
-        #self.r.Freeze();
-        #self.r.Newline();
-        #self.r.MoveToParagraphEnd();
-        self.r.BeginFontSize(12);
-        self.r.BeginTextColour(wx.Color(255,0,0))
-        self.r.InsertionPoint = 100000 #hopefully big enough
-        self.r.WriteText("test " + str(self.tester) + "\n");
-        self.r.ShowPosition(self.r.GetLastPosition());
-        #self.r.Scroll(1000,1000)
-        #self.r.
-        #self.r.Thaw();
     def RebuildMenus(self):
         '''
         Rebuilds the menus of this OutputWindow. Used for new lists of nodes, or channels
@@ -106,6 +88,7 @@ class OutputWindow(PrimaryFrame.MainWindow):
         self.AddMenuItem(self.typeMenu, "Error", self.__OnTypeError, MessageType.Error in self.selectedTypes)
         
         #channelsMenu
+        self.channelCount = len(self.sim.selectedOptions.channelList)
         for channel in self.sim.selectedOptions.channelList:
             item = self.AddMenuItem(self.channelsMenu, channel, self.__OnChannel, channel in self.selectedChannels)
             self.channelDict[item.GetId()] = channel
@@ -134,8 +117,43 @@ class OutputWindow(PrimaryFrame.MainWindow):
         
         return menuBar;
     
-        # def AddMessage(self, message):
-    
+    def __RenderMessage(self, message):
+        rendered = ""
+        if self.displayType:
+            rendered += "DEBUG " if (message.messageType == MessageType.Debug) else "ERROR "
+        if self.displayChannel:
+            rendered += "[" + message.channelList[0] + "] "
+        if self.displayNodeId:
+            rendered += " (" + str(message.nodeId) + ") "
+        rendered = rendered[:-1] + ": " + message.messageText; #render color one day?
+        if len(self.displayedText) > 0:
+            rendered = "\n" + rendered
+        
+        self.displayedText += rendered
+        if (message.messageType != MessageType.Debug):
+            self.control.BeginTextColour(wx.Color(255,0,0))
+        self.control.InsertionPoint = 100000
+        self.control.WriteText(rendered);
+        self.control.ShowPosition(self.control.GetLastPosition());
+        if (message.messageType != MessageType.Debug):
+            self.control.EndTextColour()
+        
+        
+    def AddMessage(self, message):
+        if not (message.messageType in self.selectedTypes):
+            return
+        if not (message.nodeId in self.selectedNodes):
+            return
+        if message.ContainsChannelFromList(self.selectedChannels):
+            self.__RenderMessage(message)
+        
+    def UpdateDisplay(self, event):
+        newData = self.sim.simulationState.messages.RetrieveFilteredList(self.selectedTypes,self.selectedChannels,self.selectedNodes,self.readPosition)
+        self.readPosition = newData[0]
+        for message in newData[1]:
+            self.AddMessage(message);
+        if self.channelCount != len(self.sim.selectedOptions.channelList):
+            self.RebuildMenus()
         
     def WindowType(self):
         return 1
@@ -144,19 +162,15 @@ class OutputWindow(PrimaryFrame.MainWindow):
     def __OnTypeDebug(self, event):
         if MessageType.Debug in self.selectedTypes:
             self.selectedTypes.remove(MessageType.Debug)
-            self.typeMenu.FindItemById(event.GetId()).Check(False)
         else:
             self.selectedTypes.append(MessageType.Debug)
-            self.typeMenu.FindItemById(event.GetId()).Check(True)
         self.selectedPreset = None;
             
     def __OnTypeError(self, event):
         if MessageType.Error in self.selectedTypes:
             self.selectedTypes.remove(MessageType.Error)
-            self.typeMenu.FindItemById(event.GetId()).Check(False)
         else:
             self.selectedTypes.append(MessageType.Error)
-            self.typeMenu.FindItemById(event.GetId()).Check(True)
         self.selectedPreset = None;
             
     #For the channel Menu
@@ -164,45 +178,35 @@ class OutputWindow(PrimaryFrame.MainWindow):
         channel = self.channelDict[event.GetId()]
         if channel in self.selectedChannels:
             self.selectedChannels.remove(channel)
-            self.typeMenu.FindItemById(event.GetId()).Check(False)
         else:
             self.selectedChannels.append(channel)
-            self.typeMenu.FindItemById(event.GetId()).Check(True)
         self.selectedPreset = None;
     #For the nodes Menu
     def __OnNode(self, event):
         node = self.nodeDict[event.GetId()]
         if node in self.selectedChannels:
             self.selectedChannels.remove(node)
-            self.typeMenu.FindItemById(event.GetId()).Check(False)
         else:
             self.selectedChannels.append(node)
-            self.typeMenu.FindItemById(event.GetId()).Check(True)
         self.selectedPreset = None;
     #For the display Menu
     def __OnDisplayNodeIDs(self, event):
         if self.displayNodeId:
             self.displayNodeId = False
-            self.typeMenu.FindItemById(event.GetId()).Check(False)
         else:
             self.displayNodeId = True
-            self.typeMenu.FindItemById(event.GetId()).Check(True)
         self.selectedPreset = None;
     def __OnDisplayChannels(self, event):
         if self.displayChannel:
             self.displayChannel = False
-            self.typeMenu.FindItemById(event.GetId()).Check(False)
         else:
             self.displayChannel = True
-            self.typeMenu.FindItemById(event.GetId()).Check(True)
         self.selectedPreset = None;
     def __OnDisplayTypes(self, event):
         if self.displayNodeId:
             self.displayNodeId = False
-            self.typeMenu.FindItemById(event.GetId()).Check(False)
         else:
             self.displayNodeId = True
-            self.typeMenu.FindItemById(event.GetId()).Check(True)
         self.selectedPreset = None;
     #For the presets Menu
     def __OnPreset(self, event):

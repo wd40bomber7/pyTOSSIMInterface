@@ -50,3 +50,21 @@ class InterfaceIO(object):
             except:
                 time.sleep(1.0/10000.0)
             
+    #Automatic sliding sleep time. Uses least amount of cpu time necessary
+    def __processInput(self):
+        sleepTime = 1.0/10.0
+        while self.__runInputOutput:
+            lines = self.sim.simulationState.ioQueues.LiquidateInputQueue();
+            if len(lines) <= 0:
+                sleepTime = min(1.0/5.0,sleepTime*1.3)
+            else:
+                sleepTime = max(1.0/100.0,sleepTime/1.3)
+                for line in lines:
+                    try:
+                        self.sim.simulationState.messages.ParseAndAppend(line);
+                    except:
+                        print "Malformed message[" + line + "]";
+                    
+                    
+            time.sleep(sleepTime)        
+            

@@ -57,26 +57,6 @@ class MainWindow(wx.Frame):
         
         
         #Simulation Menu
-        #Build topo menu
-        self.topoMenu = wx.Menu()
-        for topo in self.sim.savedPresets.topoFileNames:
-            menuItem = self.AddMenuItem(self.topoMenu,os.path.basename(topo),self.__OnTopoPresetClick)
-            self.topoPaths[menuItem.Id] = topo;
-        self.topoMenu.AppendSeparator();
-        self.AddMenuItem(self.topoMenu, "Load From File", self.__OnTopoLoadClick)
-        self.AddMenuItem(self.topoMenu, "New Topo File", self.__OnTopoNewClick)
-        self.simulationMenu.AppendSubMenu(self.topoMenu,"Load Topo File")
-        
-        #Build noise menu
-        self.noiseMenu = wx.Menu()
-        for noise in self.sim.savedPresets.noiseFileNames:
-            menuItem = self.AddMenuItem(self.noiseMenu,os.path.basename(noise),self.__OnNoisePresetClick)
-            self.noisePaths[menuItem.Id] = noise;
-        self.noiseMenu.AppendSeparator();
-        self.AddMenuItem(self.noiseMenu, "Load From File", self.__OnNoiseLoadClick)
-        self.AddMenuItem(self.noiseMenu, "New Noise File", self.__OnNoiseNewClick)
-        self.simulationMenu.AppendSubMenu(self.noiseMenu,"Load Noise File")
-        self.simulationMenu.AppendSeparator()
         
         self.AddMenuItem(self.simulationMenu, "Open Output Window", self.__OnShowOutput)
         self.AddMenuItem(self.simulationMenu, "Open Topo Edit Window", self.__OnShowTopo)
@@ -85,10 +65,11 @@ class MainWindow(wx.Frame):
         self.simulationMenu.AppendSeparator()
 
         self.startButton = self.AddMenuItem(self.simulationMenu, "Start", self.__OnSimulationStart)
-        self.startButton = self.AddMenuItem(self.simulationMenu, "Pause", self.__OnSimulationPause)
+        self.pauseButton = self.AddMenuItem(self.simulationMenu, "Resume" if self.sim.simulationState.simIsPaused else "Pause", self.__OnSimulationPause)
         self.stopButton = self.AddMenuItem(self.simulationMenu, "Stop", self.__OnSimulationStop)
-        self.stopButton.Enable(False)
-
+        self.startButton.Enable(not self.sim.simulationState.simIsRunning)
+        self.pauseButton.Enable(self.sim.simulationState.simIsRunning)
+        self.stopButton.Enable(self.sim.simulationState.simIsRunning)
         
         #Help Menu
         #self.AddMenuItem(self.helpMenu, "About", self.__OnHelpAbout)
@@ -130,49 +111,12 @@ class MainWindow(wx.Frame):
     def __OnClose(self, event):
         self.sim.openWindows.remove(self);
         self.Destroy();
-
-    #For the simulation Menu
-    def __OnTopoPresetClick(self, event):
-        '''
-        stub
-        '''
-        
-    def __OnTopoLoadClick(self, event):
-        '''
-        stub
-        '''
-        
-    def __OnTopoNewClick(self, event):
-        '''
-        stub
-        '''
-        
-    def __OnNoisePresetClick(self, event):
-        '''
-        stub
-        '''
-        
-    def __OnNoiseLoadClick(self, event):
-        '''
-        stub
-        '''
-    def __OnNoiseNewClick(self, event):
-        if self.__findProgram("kwrite") != None:
-            subprocess.call(["kwrite"])
-            return
-        if self.__findProgram("gedit") != None:
-            subprocess.call(["gedit"])
-            return
-        if self.__findProgram("notepad.exe") != None:
-            subprocess.call(["notepad.exe"])
-            return
-        self.sim.DebugPrint("Unable to find acceptable editor to edit noise file.")
         
         
     def __OnSimulationStart(self, event):
-        '''
-        stub
-        '''
+        if len(self.sim.selectedOptions.childPythonName) <= 0:
+            self.displayError("You must set a python file to run in the config window.")
+        
     def __OnSimulationPause(self, event):
         '''
         stub
@@ -184,7 +128,7 @@ class MainWindow(wx.Frame):
     #For the windows menu
     def __OnShowOptions(self, event):
         for window in self.sim.openWindows:
-            if window.WindowType == 2:
+            if window.WindowType() == 2:
                 window.Iconize(False) #unminimize the window.
                 window.Raise()
                 return
