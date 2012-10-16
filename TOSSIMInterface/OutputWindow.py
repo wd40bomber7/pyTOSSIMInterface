@@ -95,7 +95,7 @@ class OutputWindow(PrimaryFrame.MainWindow):
         
         #nodesMenu
         for node in self.sim.simulationState.currentTopo.nodeDict:
-            item = self.AddMenuItem(self.nodesMenu, "Node " + str(node), self.__OnNode, node in self.selectedChannels)
+            item = self.AddMenuItem(self.nodesMenu, "Node " + str(node), self.__OnNode, node in self.selectedNodes)
             self.nodeDict[item.GetId()] = node
 
         #self.nodesMenu.AppendSeparator();
@@ -240,7 +240,7 @@ class OutputWindow(PrimaryFrame.MainWindow):
             self.sim.savedPresets.outputPresets.remove(presetsDict[dlg.GetStringSelection()]);
         dlg.Destroy()
         self.RebuildMenus();
-        self.sim.SavePresets();
+        #self.Sim.SavePresets();
         
     def __OnPresetAdd(self, event):
         dialog = wx.TextEntryDialog(None,"Choose a name for the preset:", "Preset Name","");
@@ -262,5 +262,5 @@ class OutputWindow(PrimaryFrame.MainWindow):
             self.sim.savedPresets.outputPresets.append(newPreset);
             self.RebuildMenus();
         dialog.Destroy()
-        self.sim.SavePresets();
+        #self.Sim.SavePresets();
         

@@ -88,16 +88,13 @@ class MainWindow(wx.Frame):
         else:
             addToMenu.Append(wx.ID_ANY,text);
         
-        item = addToMenu.GetMenuItems()[len(addToMenu.GetMenuItems())-1]
+        item = addToMenu.GetMenuItems()[len(addToMenu.GetMenuItems())-1] # The only way I've found of getting the object just created
         if checked != None:
             item.Check(checked)
         if bindTo != None:
             self.Bind(wx.EVT_MENU, bindTo, item)
-            self.__boundEvents.append(item) #hack to make my menus work. Hehe sneakys
-        #if not addToMenu in self.__menuItems:
-            #addToMenu.myItems = list()
-            #self.__menuItems.append(addToMenu)
-        #addToMenu.myItems.append(item.GetId());
+            self.__boundEvents.append(item) #Keep track of bindings so they can be unbound when menu is re-created
+
         return item;
 
     def __CleanMenus(self):
@@ -111,6 +108,7 @@ class MainWindow(wx.Frame):
         print "Menus cleaned"
 
     def __OnClose(self, event):
+        self.sim.SavePresets(); #incase you make changes to presets save them
         self.sim.openWindows.remove(self);
         self.Destroy();
         
@@ -123,7 +121,8 @@ class MainWindow(wx.Frame):
             time.sleep(.1)
         print "Command timed out"
         return "";
-    def __OnSimulationStart(self, event):
+    
+    def StartSimulation(self):
         if len(self.sim.selectedOptions.childPythonName) <= 0:
             self.displayError("You must set a python file to run in the config window.")
             return
@@ -165,17 +164,19 @@ class MainWindow(wx.Frame):
             self.sim.simulationState.ioReadWrite = None
             self.sim.simulationState.simIsRunning = False;
             self.displayError("Target was unable to load topo file. Make sure directory is not relative.");
-	    return;
+        return;
         self.sim.simulationState.ioQueues.QueueOutput("Setnoise " + self.sim.selectedOptions.noiseFileName)
         if self.__WaitForCommand() != "_noiseloaded success":
             self.sim.simulationState.ioReadWrite.StopThreads()
             self.sim.simulationState.ioReadWrite = None
             self.sim.simulationState.simIsRunning = False;
             self.displayError("Target was unable to load noise file. Make sure directory is not relative.");
-	    return;
+        return;
         self.sim.simulationState.ioQueues.QueueOutput("Startsimulation")
         for window in self.sim.openWindows:
             window.RebuildMenus()
+    def __OnSimulationStart(self, event):
+        self.StartSimulation()
         
     def __OnSimulationPause(self, event):
         self.sim.simulationState.ioQueues.QueueOutput("Pausesimulation")
@@ -205,9 +206,8 @@ class MainWindow(wx.Frame):
         self.sim.WindowBuilders["OutputWindow"](self.sim)
         
     def __OnShowTopo(self, event):
-        '''
-        stub   
-        '''
+        self.sim.WindowBuilders["TopoWindow"](self.sim)
+        
     def __OnShowCommand(self, event):
         '''
         stub   
@@ -225,7 +225,15 @@ class MainWindow(wx.Frame):
         dialog = wx.MessageDialog(parent=None,message=msg,caption="Error",style=wx.OK|wx.ICON_INFORMATION);
         dialog.ShowModal();
         dialog.Destroy(); 
-        
+    def TopoUpdate(self):
+        if self.sim.simulationState.AttemptTopoLoad(self.sim.selectedOptions.topoFileName):
+            self.sim.savedPresets.addTopo(self.sim.selectedOptions.topoFileName)
+            for window in self.sim.openWindows:
+                if window.WindowType() == 1:
+                    window.RebuildMenus()
+                elif window.WindowType() == 3:
+                    window.RepaintTopo()
+                
     #other methods
     def __findProgram(self,program):
         def is_exe(fpath):

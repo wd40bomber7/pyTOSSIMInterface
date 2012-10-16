@@ -15,14 +15,23 @@ class SimOptions(object):
     '''
     This class stores the options that control the basic paramaters of the simulation
     '''
-    def __init__(self):
-        self.autolearnChannels = True
-        self.childPythonName = ""
-        self.topoFileName = ""
-        self.noiseFileName = ""
-        self.channelList = list()
-        self.opsPerSecond = 10000000
-        self.name = ""
+    def __init__(self, toCopy = None):
+        if toCopy is None:
+            self.autolearnChannels = True
+            self.childPythonName = ""
+            self.topoFileName = ""
+            self.noiseFileName = ""
+            self.channelList = list()
+            self.opsPerSecond = 10000000
+            self.name = ""
+        else:
+            self.autolearnChannels = toCopy.autolearnChannels
+            self.childPythonName = toCopy.childPythonName
+            self.topoFileName = toCopy.topoFileName
+            self.noiseFileName = toCopy.noiseFileName
+            self.channelList = list(toCopy.channelList)
+            self.opsPerSecond = toCopy.opsPerSecond
+            self.name = toCopy.name
 
       
 class SimOutput(object):
@@ -128,9 +137,15 @@ class SimPresets(object):
     def __init__(self):
         self.outputPresets = list() #list of all saved output window presets
         self.configPresets = list() #List of all SimOptions stored presets
+        self.topoHistory = list()
+        self.lastSimulationOptions = SimOptions()
         
-        self.lastTopoFile = "";
-        self.lastSimulationOptions = SimOptions();
+    def addTopo(self,topoFile):
+        if topoFile in self.topoHistory:
+            self.topoHistory.remove(topoFile)
+        elif len(self.topoHistory) == 5:
+            self.topoHistory.remove(self.topoHistory[0]);
+        self.topoHistory.append(topoFile)
     
 class SimQueues(object):
     '''
@@ -224,9 +239,16 @@ class SimState(object):
         self.messages = Messages.MessagePool()
         self.simIsRunning = False
         self.simIsPaused = False
-        self.currentTopo = SimTopo();
-    
-    
+        self.currentTopo = SimTopo()
+
+    def AttemptTopoLoad(self, topoFile):
+        try:
+            self.currentTopo = SimTopo(topoFile)
+            return True
+        except:
+            self.currentTopo = SimTopo()
+            return False
+
 class Sim(object):
     '''
     Stores all data about the current simulation
@@ -237,8 +259,13 @@ class Sim(object):
         self.savedPresets = SimPresets()
         self.simulationState = SimState()
         #other data
+        self.overrideDefaultConfig = False
         self.openWindows = list()
+        
     
+    def EnableOverride(self):
+        self.overrideDefaultConfig = True
+        
     def LoadPresets(self):
         try:
             presetFile = open('presets.bin','rb')
@@ -251,7 +278,8 @@ class Sim(object):
             self.savedPresets = SimPresets()
             return #preset file corrupt
         presetFile.close()
-        self.selectedOptions = self.savedPresets.lastSimulationOptions
+        self.selectedOptions = SimOptions(self.savedPresets.lastSimulationOptions)
+        self.simulationState.AttemptTopoLoad(self.selectedOptions.topoFileName);
         
     def SavePresets(self):
         try:
@@ -259,8 +287,8 @@ class Sim(object):
         except:
             print "Saving presets failed"
             return #Uhm? Error TODO:Make this error actually create a modal dialog or something
-        
-        self.savedPresets.lastSimulationOptions = self.selectedOptions
+        if not self.overrideDefaultConfig:
+            self.savedPresets.lastSimulationOptions = SimOptions(self.selectedOptions)
         pickle.dump(self.savedPresets,presetFile,-1)
         
         presetFile.close()

@@ -159,7 +159,7 @@ class ConfigWindow(PrimaryFrame.MainWindow):
         if dlg.ShowModal() == wx.ID_OK:
             self.pythonChildTextbox.Value = dlg.GetPath()
             self.sim.selectedOptions.childPythonName = self.pythonChildTextbox.Value
-            self.sim.SavePresets()
+            #self.Sim.SavePresets()
         dlg.Destroy()
     def __OnTopoBrowse(self, event):
         dlg = wx.FileDialog(
@@ -169,7 +169,7 @@ class ConfigWindow(PrimaryFrame.MainWindow):
         if dlg.ShowModal() == wx.ID_OK:
             self.topoFileTextbox.Value = dlg.GetPath()
             self.sim.selectedOptions.topoFileName = self.topoFileTextbox.Value
-            self.sim.SavePresets()
+            #self.Sim.SavePresets()
         dlg.Destroy()
     def __OnNoiseBrowse(self, event):
         dlg = wx.FileDialog(
@@ -179,28 +179,28 @@ class ConfigWindow(PrimaryFrame.MainWindow):
         if dlg.ShowModal() == wx.ID_OK:
             self.noiseFileTextbox.Value = dlg.GetPath()
             self.sim.selectedOptions.noiseFileName = self.noiseFileTextbox.Value
-            self.sim.SavePresets()
+            #self.Sim.SavePresets()
         dlg.Destroy()
     #for the dialog
     def __OnPythonChildChange(self, event):
         self.sim.selectedOptions.childPythonName = self.pythonChildTextbox.Value
-        self.sim.SavePresets()
+        #self.Sim.SavePresets()
         
     def __OnTopoFileChange(self, event):
         self.sim.selectedOptions.topoFileName = self.topoFileTextbox.Value
-        self.sim.SavePresets()
+        self.TopoUpdate()
         
     def __OnNoiseFileChange(self, event):
         self.sim.selectedOptions.noiseFileName = self.noiseFileTextbox.Value
-        self.sim.SavePresets()
+        #self.Sim.SavePresets()
         
     def __OnOpCountChange(self, event):
         self.sim.selectedOptions.opsPerSecond = int(self.opCountTextbox.Value)
-        self.sim.SavePresets()
+        #self.Sim.SavePresets()
         
     def __OnAutoChannelLearnChange(self, event):
         self.sim.selectedOptions.autolearnChannels = self.autoLearnCheckbox.Value
-        self.sim.SavePresets()
+        #self.Sim.SavePresets()
        
     def __OnChannelAdd(self, event):
         dialog = wx.TextEntryDialog(None,"Enter the channel name:", "Channel Name","");
@@ -217,7 +217,7 @@ class ConfigWindow(PrimaryFrame.MainWindow):
             self.sim.selectedOptions.channelList.append(name)
         dialog.Destroy()
         self.channelListBox.Set(self.sim.selectedOptions.channelList)
-        self.sim.SavePresets();
+        #self.Sim.SavePresets();
         
     def __OnChannelRemove(self, event):
         dlg = wx.SingleChoiceDialog(self, "Choose a preset to remove.", "Preset List",self.sim.selectedOptions.channelList, wx.CHOICEDLG_STYLE)
@@ -226,7 +226,7 @@ class ConfigWindow(PrimaryFrame.MainWindow):
             self.sim.selectedOptions.channelList.remove(dlg.GetStringSelection());
         dlg.Destroy()
         self.channelListBox.Set(self.sim.selectedOptions.channelList)
-        self.sim.SavePresets();
+        #self.Sim.SavePresets();
     
     
     #For the presets Menu
@@ -249,7 +249,7 @@ class ConfigWindow(PrimaryFrame.MainWindow):
             self.sim.savedPresets.configPresets.remove(presetsDict[dlg.GetStringSelection()]);
         dlg.Destroy()
         self.RebuildMenus();
-        self.sim.SavePresets();
+        #self.Sim.SavePresets();
         
     def __OnPresetAdd(self, event):
         dialog = wx.TextEntryDialog(None,"Choose a name for the preset:", "Preset Name","");
@@ -269,7 +269,7 @@ class ConfigWindow(PrimaryFrame.MainWindow):
             self.sim.savedPresets.configPresets.append(newPreset);
             self.RebuildMenus();
         dialog.Destroy()
-        self.sim.SavePresets();
+        #self.Sim.SavePresets();
         
 class NumericObjectValidator(wx.PyValidator):
     def __init__(self):
