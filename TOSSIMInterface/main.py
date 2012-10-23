@@ -12,9 +12,16 @@ import wx
 import Simulation
 import OutputWindow
 import ConfigWindow
-import TopoWindow
+import InjectionWindow
 import sys
 from optparse import OptionParser
+
+topoWindowAllowed = False
+try:
+    import TopoWindow
+    topoWindowAllowed = True
+except:
+    topoWindowAllowed = False
 
 parser = OptionParser()
 parser.add_option("-o","--override-config",action="store_true",dest="override", default = False,
@@ -57,7 +64,11 @@ app = wx.App(False)
 programState.WindowBuilders = dict();
 programState.WindowBuilders["OutputWindow"] = OutputWindow.OutputWindow
 programState.WindowBuilders["ConfigWindow"] = ConfigWindow.ConfigWindow
-programState.WindowBuilders["TopoWindow"] = TopoWindow.TopoWindow
+if topoWindowAllowed:
+    programState.WindowBuilders["TopoWindow"] = TopoWindow.TopoWindow
+else:
+    programState.WindowBuilders["TopoWindow"] = None
+programState.WindowBuilders["InjectionWindow"] = InjectionWindow.InjectionWindow
 
 if options.window is None:
     frame = ConfigWindow.ConfigWindow(programState);
@@ -65,6 +76,8 @@ elif options.window == "config":
     frame = ConfigWindow.ConfigWindow(programState);
 elif options.window == "output":
     frame = OutputWindow.OutputWindow(programState);
+elif options.window == "topo":
+    frame = TopoWindow.TopoWindow(programState);
 else:
     print "Invalid options for -w, type -h or --help to print help."
     exit()

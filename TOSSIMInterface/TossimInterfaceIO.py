@@ -28,7 +28,7 @@ class InterfaceIO(object):
             raise Exception("Unable to find file")
         
         print "Running cmd \"python" + pythonToBind + "\""
-        self.p = subprocess.Popen(["python",pythonToBind],stdout=subprocess.PIPE,stdin=subprocess.PIPE)
+        self.p = subprocess.Popen(["python",pythonToBind,"--child"],stdout=subprocess.PIPE,stdin=subprocess.PIPE)
         
         if self.p is None:
             raise Exception("Unable to find file")

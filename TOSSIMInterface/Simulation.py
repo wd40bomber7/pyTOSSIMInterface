@@ -64,36 +64,17 @@ class SimNode(object):
     This class holds all information about a single node
     '''     
     
-    def __init__(self):
-        self.canReceiveFromList = list() #List of node objects
-        self.canSendToList = list()      #List of node objects
-        self.bidirectionalList = list()  #List of node objects
-        self.myId = 0;
+    def __init__(self,myId):
+        self.connectNodes = list()  #List of node objects
+        self.myId = myId;
+class SimConnection(object):
+    '''
+    This class holds all information about a node connection
+    '''     
     
-    def AddNodeThatCanBeSentTo(self, node,connectionStrength):
-        '''
-        Adds a node that this node has a send to connection to
-        '''
-        
-        for c in self.canReceiveFromList:
-            if c.connectTo == node:
-                self.canReceiveFromList.remove(c) #TODO: Add support for bidirectional connections with different connection strengths
-                self.bidirectionalList.append(c)
-                return
-
-        self.canSendToList.append(NodeConnection(node,connectionStrength))
-            
-    def AddNodeThatCanBeReceivedFrom(self, node, connectionStrength):
-        '''
-        Adds a node that can hear messages sent by this node
-        '''
-        for c in self.canSendToList:
-            if c.connectTo == node:
-                self.canSendToList.remove(c) #TODO: Add support for bidirectional connections with different connection strengths
-                self.bidirectionalList.append(c)
-                return
-            
-            self.canReceiveFromList.append(NodeConnection(node,connectionStrength))
+    def __init__(self,fromNode,toNode):
+        self.fromNode = fromNode
+        self.toNode = toNode
     
 class SimTopo(object):
     '''
@@ -104,6 +85,7 @@ class SimTopo(object):
         
         self.nodeDict = dict(); #maps a node ids to node objects
         self.topoFileName = ""
+        self.connectionList = list()
         
         if topoFile == None:
             return;
@@ -120,14 +102,16 @@ class SimTopo(object):
                 continue;
             fromNode = int(parts[0]);
             toNode = int(parts[1]);
+            self.connectionList.append(SimConnection(fromNode,toNode))
             if not (fromNode in self.nodeDict):
-                self.nodeDict[fromNode] = SimNode()   
+                self.nodeDict[fromNode] = SimNode(fromNode)   
             if not (toNode in self.nodeDict):
-                self.nodeDict[toNode] = SimNode()
+                self.nodeDict[toNode] = SimNode(toNode)
             
-            self.nodeDict[fromNode].AddNodeThatCanBeSentTo(self.nodeDict[toNode],float(parts[2]));
-            self.nodeDict[toNode].AddNodeThatCanBeSentTo(self.nodeDict[toNode],float(parts[2]));
-        
+            if not self.nodeDict[toNode] in self.nodeDict[fromNode].connectNodes:
+                self.nodeDict[fromNode].connectNodes.append(self.nodeDict[toNode])
+            if not self.nodeDict[fromNode] in self.nodeDict[toNode].connectNodes:
+                self.nodeDict[toNode].connectNodes.append(self.nodeDict[fromNode])        
     
 class SimPresets(object):
     '''

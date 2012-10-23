@@ -4,8 +4,30 @@ Created on Oct 14, 2012
 @author: wd40bomber7
 '''
 
-import _TOSSIM
+guipath = "main.py"
+noise = "no_noise.txt"
+topo = "topo.txt"
+
+
+
+
+
+#Code below this point should not be modified!
 import sys
+import os
+import subprocess
+if len(sys.argv) <= 1:
+    topoPath = os.path.abspath(topo);
+    noisePath = os.path.abspath(noise);
+    myPath = os.path.realpath(__file__)
+    subprocess.call([guipath,"--override-config",
+                     "--topo=\"" + topoPath + "\"",
+                     "--noise=\"" + noisePath + "\"",
+                     "--python-child=\"" + myPath + "\"",
+                     "--start"])
+    exit()
+    
+import _TOSSIM
 import threading
 import time
 import collections

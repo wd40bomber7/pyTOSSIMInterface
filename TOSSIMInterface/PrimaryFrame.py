@@ -206,12 +206,14 @@ class MainWindow(wx.Frame):
         self.sim.WindowBuilders["OutputWindow"](self.sim)
         
     def __OnShowTopo(self, event):
-        self.sim.WindowBuilders["TopoWindow"](self.sim)
+        if self.sim.WindowBuilders["TopoWindow"] is None:
+            self.displayError("You must install pygraphviz to use the topo map.")
+        else:
+            self.sim.WindowBuilders["TopoWindow"](self.sim)
         
     def __OnShowCommand(self, event):
-        '''
-        stub   
-        '''
+        self.sim.WindowBuilders["InjectionWindow"](self.sim)
+        
     def __OnShowNoise(self, event):
         '''
         stub   
