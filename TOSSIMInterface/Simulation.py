@@ -102,17 +102,107 @@ class SimTopo(object):
                 continue;
             fromNode = int(parts[0]);
             toNode = int(parts[1]);
-            self.connectionList.append(SimConnection(fromNode,toNode))
-            if not (fromNode in self.nodeDict):
-                self.nodeDict[fromNode] = SimNode(fromNode)   
-            if not (toNode in self.nodeDict):
-                self.nodeDict[toNode] = SimNode(toNode)
+            self.AddConnection(fromNode, toNode)
+    def WriteTopoFile(self):
+        fileData = list()
+        for connection in self.connectionList:
+            fileData.append(str(connection.fromNode) + " " + str(connection.toNode) + " -54.0\n")
+        topoFile = open(self.topoFileName,'w')
+        topoFile.writelines(fileData)  
+        topoFile.close()
+        
+    def AddConnection(self,fromNode,toNode):
+        for connection in self.connectionList:
+            if connection.fromNode == fromNode and connection.toNode == toNode:
+                return
+            #elif connection.fromNode == toNode and connection.toNode == fromNode:
+            #    return
             
-            if not self.nodeDict[toNode] in self.nodeDict[fromNode].connectNodes:
-                self.nodeDict[fromNode].connectNodes.append(self.nodeDict[toNode])
-            if not self.nodeDict[fromNode] in self.nodeDict[toNode].connectNodes:
-                self.nodeDict[toNode].connectNodes.append(self.nodeDict[fromNode])        
-    
+        self.connectionList.append(SimConnection(fromNode,toNode))
+        if not (fromNode in self.nodeDict):
+            self.nodeDict[fromNode] = SimNode(fromNode)   
+        if not (toNode in self.nodeDict):
+            self.nodeDict[toNode] = SimNode(toNode)
+        
+        if not self.nodeDict[toNode] in self.nodeDict[fromNode].connectNodes:
+            self.nodeDict[fromNode].connectNodes.append(self.nodeDict[toNode])
+        if not self.nodeDict[fromNode] in self.nodeDict[toNode].connectNodes:
+            self.nodeDict[toNode].connectNodes.append(self.nodeDict[fromNode])
+            
+    def RemoveNode(self, nodeId, redoNodes=True):
+          
+        self.connectionList[:] = [i for i in self.connectionList if i.fromNode != nodeId and i.toNode != nodeId]
+        node = self.nodeDict[nodeId]                  
+        del self.nodeDict[nodeId]
+        
+        toDelete = list()
+        for neighbor in node.connectNodes:
+            neighbor.connectNodes.remove(node)
+            if len(neighbor.connectNodes) <= 0:
+                toDelete.append(neighbor)
+        node = None
+        for neighbor in toDelete:
+            if neighbor.myId in self.nodeDict:
+                self.RemoveNode(neighbor.myId,False)
+        
+        if redoNodes:
+            self.RedoNumbers()
+    def __FilterConnection(self, connection):
+        fromNodeId = self.connectionToRemove.fromNode
+        toNodeId = self.connectionToRemove.toNode
+        if connection.fromNode == fromNodeId and connection.toNode == toNodeId:
+            print "dropped connection"
+            return False
+        elif connection.toNode == fromNodeId and connection.fromNode == toNodeId:
+            print "dropped other connection"
+            return False     
+        return True           
+    def RemoveConnection(self, fromNodeId, toNodeId):
+        self.connectionToRemove = SimConnection(fromNodeId,toNodeId)
+        self.connectionList = filter(self.__FilterConnection,self.connectionList)
+        
+        fromNode = self.nodeDict[fromNodeId]
+        toNode = self.nodeDict[toNodeId]
+        
+        fromNode.connectNodes.remove(toNode)
+        toNode.connectNodes.remove(fromNode)
+        if len(fromNode.connectNodes) <= 0:
+            self.RemoveNode(fromNodeId,False)
+        if len(toNode.connectNodes) <= 0:
+            self.RemoveNode(toNodeId,False)
+        self.RedoNumbers()
+        
+    def AddNode(self, connectedToNode):
+        
+        nodeId = len(self.nodeDict)+1
+        print "Using nodeid " + str(nodeId)
+        self.nodeDict[nodeId] = SimNode(nodeId)
+        node = self.nodeDict[nodeId]
+        self.connectionList.append(SimConnection(nodeId,connectedToNode.myId))
+        self.connectionList.append(SimConnection(connectedToNode.myId,nodeId))
+        connectedToNode.connectNodes.append(node)
+        node.connectNodes.append(connectedToNode)
+        
+        
+    def RedoNumbers(self):
+        reId = dict()
+        iterator = 0
+        allNodes = list()
+        #Build a transformation dictionary (old node ids to new node ids)
+        for nodeId in self.nodeDict:
+            iterator += 1
+            reId[nodeId] = iterator
+            allNodes.append(self.nodeDict[nodeId])
+        self.nodeDict.clear()
+        for node in allNodes:
+            node.myId = reId[node.myId]
+            self.nodeDict[node.myId] = node
+        for connection in self.connectionList:
+            connection.fromNode = reId[connection.fromNode]
+            connection.toNode = reId[connection.toNode]
+            #print "[" + str(connection.fromNode) + "->" + str(connection.toNode) + "]"
+        
+        
 class SimPresets(object):
     '''
     Used to easily pickle all current presets

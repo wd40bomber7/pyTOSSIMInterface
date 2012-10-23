@@ -10,6 +10,7 @@ import PrimaryFrame;
 import Simulation
 import io
 import pygraphviz as pgv
+from Simulation import SimConnection
 
 class TopoWindow(PrimaryFrame.MainWindow):
     '''
@@ -20,26 +21,36 @@ class TopoWindow(PrimaryFrame.MainWindow):
         '''
         Constructor
         '''
-        #Variables
-        self.drawingConnection = True
-        #self.Bind(event, handler, source, id, id2)
         #setup
         super(TopoWindow,self).__init__(sim,"Topo Edit Window")
-        #self.BackgroundColour()
-        
+        #Variables
+        self.topoData = None
+
         #Create menus
         self.topoFileMenu = wx.Menu()
         self.nodeMenu = wx.Menu()
         #Register menus
         self.RegisterMenu(self.topoFileMenu);
-        self.RegisterMenu(self.nodeMenu);
+        #self.RegisterMenu(self.nodeMenu);
         #Append menus
         self.menuBar.Append(self.topoFileMenu,"Topo Files")
-        self.menuBar.Append(self.nodeMenu,"Nodes")
+        #self.menuBar.Append(self.nodeMenu,"Nodes")
         
         self.RebuildMenus()
         
-        self.sketch = SketchWindow(self, -1)
+        self.nodePanel = SketchWindow(self, -1)
+        sizer = wx.BoxSizer(wx.HORIZONTAL)
+        sizer.Add(self.nodePanel,1,wx.EXPAND)
+        self.SetSizer(sizer)
+        self.SetAutoLayout(True)
+        print "Registered panel"
+        #Mouse events for editing
+        self.nodePanel.Bind(wx.EVT_LEFT_DOWN, self.__OnMouseLeftDown, self.nodePanel)
+        self.nodePanel.Bind(wx.EVT_LEFT_UP, self.__OnMouseLeftUp, self.nodePanel)
+        self.nodePanel.Bind(wx.EVT_LEAVE_WINDOW, self.__OnMouseLeave, self.nodePanel)
+        self.nodePanel.Bind(wx.EVT_MOTION, self.__OnMouseMove, self.nodePanel)
+        self.nodePanel.Bind(wx.EVT_RIGHT_DOWN, self.__OnMouseRightClick, self.nodePanel)
+        
         self.Show();
         
 
@@ -53,11 +64,13 @@ class TopoWindow(PrimaryFrame.MainWindow):
         self.topoDict = dict();
         #Make this an open/save/save as/new menu setup. Open should be a submenu
         #presetMenu
-        for topoFile in self.sim.savedPresets.topoHistory:
+        for i in range(len(self.sim.savedPresets.topoHistory)-1,-1,-1):
+            topoFile = self.sim.savedPresets.topoHistory[i]
             item = self.AddMenuItem(self.topoFileMenu, topoFile, self.__OnTopoSelect)
             self.topoDict[item.GetId()] = topoFile
         self.topoFileMenu.AppendSeparator();
         self.AddMenuItem(self.topoFileMenu, "Browse", self.__OnTopoBrowse)
+        self.AddMenuItem(self.topoFileMenu, "New", self.__OnTopoNew)
         
         self.AddMenuItem(self.nodeMenu, "Delete Node", self.__OnNodeRemove)
         self.AddMenuItem(self.nodeMenu, "Add Node", self.__OnNodeAdd)
@@ -72,7 +85,13 @@ class TopoWindow(PrimaryFrame.MainWindow):
         '''
         #First build the graphviz object with the list of connections
         graph=pgv.AGraph()
+        onlyOneWay = list()
         for connection in self.topoData.connectionList:
+            firstCheck = connection.fromNode * 1000 + connection.toNode
+            secondCheck = connection.toNode * 1000 + connection.fromNode
+            if (firstCheck in onlyOneWay) or (secondCheck in onlyOneWay):
+                continue;
+            onlyOneWay.append(firstCheck)
             graph.add_edge(connection.fromNode, connection.toNode)
             
         graph.node_attr['shape'] = 'point'
@@ -108,7 +127,7 @@ class TopoWindow(PrimaryFrame.MainWindow):
                 nodeLayout[n.id] = n
         for nodeId in nodeLayout:
             node = nodeLayout[nodeId]
-            print "<" + str(node.x) + "," + str(node.y) + ">"
+            #print "<" + str(node.x) + "," + str(node.y) + ">"
             if nodeMinX == nodeMaxX:
                 node.x = .5
             else:
@@ -119,17 +138,21 @@ class TopoWindow(PrimaryFrame.MainWindow):
                 node.y = (node.y - nodeMinY)/(nodeMaxY - nodeMinY) * .8 + .1
             
                 
-        self.sketch.connectedNodes = nodeLayout;
+        self.nodePanel.connectedNodes = nodeLayout;
         self.Refresh()
-        
-    def LoadTopo(self):
+    def SaveTopo(self):
         #try:
-        self.topoData = Simulation.SimTopo(self.currentTopoFile)
-        self.sim.savedPresets.addTopo(self.currentTopoFile)
+            self.topoData.WriteTopoFile()
         #except:
-        #    self.topoData = None;
-        #    self.displayError("Unable to load selected topo file.");
-        #    return;
+        #    self.displayError("Failed to save topo file! Changes not saved.")
+    def LoadTopo(self):
+        try:
+            self.topoData = Simulation.SimTopo(self.currentTopoFile)
+            self.sim.savedPresets.addTopo(self.currentTopoFile)
+        except:
+            self.topoData = None;
+            self.displayError("Unable to load selected topo file.");
+            return;
         self.RelayerTopo()
     #browse buttons
     def __OnNodeAdd(self, event):
@@ -154,43 +177,145 @@ class TopoWindow(PrimaryFrame.MainWindow):
             self.LoadTopo()
             #self.Sim.SavePresets()
         dlg.Destroy()
-        
+    def __OnTopoNew(self, event):
+        dlg = wx.FileDialog(
+            self, message="Choose a filename",
+            wildcard="Text files (*.txt)|*.txt|All files (*.*)|*.*",
+            style=wx.SAVE)
+        if dlg.ShowModal() == wx.ID_OK:
+            self.currentTopoFile = dlg.GetPath()
+            try:
+                self.topoData = Simulation.SimTopo()
+                self.topoData.topoFileName = self.currentTopoFile
+                self.topoData.AddConnection(1, 2)
+                self.topoData.AddConnection(2, 1)
+                self.topoData.WriteTopoFile()
+                self.sim.savedPresets.addTopo(self.currentTopoFile)
+            except:
+                self.topoData = None
+                self.displayError("Unable to create topo file there.")
+                return;
+            
+            self.RelayerTopo()
+        dlg.Destroy()        
     #Editing handlers
     def __OnMouseMove(self, event):
-        '''
-        stub
-        '''
+        if not self.nodePanel.nodeFrom is None:
+            self.nodePanel.lineX = event.GetX()
+            self.nodePanel.lineY = event.GetY()
+            self.Refresh()
+        
     def __OnMouseLeave(self, event):
-        '''
-        stub
-        '''
+        self.nodePanel.nodeFrom = None
+        self.Refresh()
+        
     def __OnMouseLeftDown(self, event):
-        '''
-        stub
-        '''
+        #print "Click at (" + str(event.GetX()) + "," + str(event.GetY()) + ")"
+        if self.topoData is None:
+            return
+        
+        selectedNode = None
+        for pos in self.nodePanel.nodePositions:
+            distanceSquared = (pos.x-event.GetX()) ** 2 + (pos.y-event.GetY()) ** 2
+            if distanceSquared < 80:
+                selectedNode = pos
+        if selectedNode is None:
+            return
+        self.nodePanel.nodeFrom = selectedNode
+        self.nodePanel.lineX = event.GetX()
+        self.nodePanel.lineY = event.GetY()
+        
     def __OnMouseLeftUp(self, event):
-        '''
-        stub
-        '''
+        if not self.nodePanel.nodeFrom is None:
+            selectedNode = None
+            for pos in self.nodePanel.nodePositions:
+                distanceSquared = (pos.x-event.GetX()) ** 2 + (pos.y-event.GetY()) ** 2
+                if distanceSquared < 80:
+                    selectedNode = pos
+            if (not selectedNode is None) and (selectedNode.id != self.nodePanel.nodeFrom.id):
+                toSimNode = self.topoData.nodeDict[selectedNode.id]
+                fromSimNode = self.topoData.nodeDict[self.nodePanel.nodeFrom.id]
+                self.topoData.connectionList.append(SimConnection(fromSimNode.myId,toSimNode.myId))
+                self.topoData.connectionList.append(SimConnection(toSimNode.myId,fromSimNode.myId))
+                toSimNode.connectNodes.append(fromSimNode)
+                fromSimNode.connectNodes.append(toSimNode)
+            elif not selectedNode is None:
+                print "Adding stand alone node"
+                self.topoData.AddNode(self.topoData.nodeDict[self.nodePanel.nodeFrom.id])
+            
+            self.nodePanel.nodeFrom = None
+            self.RelayerTopo()
+            self.SaveTopo()
+        
     def __OnMouseRightClick(self, event):
-        '''
-        stub
-        '''
+        #First see if they're removing a node
+        if self.topoData is None:
+            return
+        selectedNode = None
+        for pos in self.nodePanel.nodePositions:
+            distanceSquared = (pos.x-event.GetX()) ** 2 + (pos.y-event.GetY()) ** 2
+            if distanceSquared < 80:
+                selectedNode = pos
+        if not selectedNode is None:
+            #Remove from connections list
+            self.topoData.RemoveNode(selectedNode.id)
+            self.RelayerTopo()
+            self.SaveTopo()
+            return
+        
+        
+        p = Node(0,event.GetX(),event.GetY())
+        selectedConnection = None
+        for line in self.nodePanel.nodeConnections:
+            dist = line.distToNode(p)
+            if dist < 10:
+                selectedConnection = line;
+        if selectedConnection is None:
+            return;
+        self.topoData.RemoveConnection(selectedConnection.a.id, selectedConnection.b.id)
+        self.RelayerTopo()
+        self.SaveTopo()
+        
 class Node(object):
     def __init__ (self, node,x=0,y=0):
         self.x = x
         self.y = y
         self.id = node
         self.connections = list()
-class SketchWindow(wx.Window):
+class Line(object):
+    def __init__(self,a,b):
+        self.a = a
+        self.b = b
+        
+    def distToNode(self, n):
+        #Find minimum distance from a point to this node. Equation from Stack overflow
+        self.n = n
+        lengthSquared = (self.a.x-self.b.x) ** 2 + (self.a.y-self.b.y) ** 2
+        if lengthSquared == 0.0:
+            return ((self.a.x-self.n.x) ** 2 + (self.a.y-self.n.y) ** 2) ** 0.5
+        proj = (self.n.x - self.a.x)*(self.b.x - self.a.x) + (self.n.y - self.a.y)*(self.b.y - self.a.y)
+        proj = proj/lengthSquared
+        if proj < 0.0:
+            return ((self.a.x-self.n.x) ** 2 + (self.a.y-self.n.y) ** 2) ** 0.5
+        elif proj > 1.0:
+            return ((self.b.x-self.n.x) ** 2 + (self.b.y-self.n.y) ** 2) ** 0.5
+        projX = self.a.x + proj*(self.b.x - self.a.x)
+        projY = self.a.y + proj*(self.b.y - self.a.y)
+        return ((projX-self.n.x) ** 2 + (projY-self.n.y) ** 2) ** 0.5
+        
+class SketchWindow(wx.Panel):
 
     def __init__ (self, parent,ID):
 
-        wx.Window.__init__(self, parent, ID)
+        wx.Panel.__init__(self, parent, ID)
         
         n = Node(node=Simulation.SimNode(5))
         self.lonelyNodes = [n,n,n]
         self.connectedNodes = dict()
+        self.nodePositions = list()
+        self.nodeConnections = list()
+        self.lineX = self.lineY = -1.0
+        self.nodeFrom = None
         
         self.Buffer = None
 
@@ -209,7 +334,7 @@ class SketchWindow(wx.Window):
         dc.SelectObject(self.Buffer)
         dc.SetBackground(wx.Brush(self.GetBackgroundColour()))
         dc.Clear()
-        self.Drawnodes(dc)
+        #self.Drawnodes(dc)
         dc.SelectObject(wx.NullBitmap)
         return True
 
@@ -227,7 +352,8 @@ class SketchWindow(wx.Window):
                 neighborNode = self.connectedNodes[neighborId]
                 x2 = neighborNode.x*width
                 y2 = neighborNode.y*height
-                dc.DrawLine(x1,y1,x2,y2) 
+                dc.DrawLine(x1,y1,x2,y2)
+                self.nodeConnections.append(Line(Node(node.id,x1,y1),Node(neighborNode.id,x2,y2)))
                 
         #Second draw nodes
         pen=wx.Pen('blue',8)
@@ -238,8 +364,15 @@ class SketchWindow(wx.Window):
             y = node.y*height
             
             dc.DrawLabel(str(node.id),wx.Rect(x=x-25,y=y-20,width=45,height=20))
-            dc.DrawCircle(x,y,3)   
+            dc.DrawCircle(x,y,3) 
+            #Store the position for later use  
+            self.nodePositions.append(Node(nodeId,x,y))
             
+        #Finally draw line
+        if not self.nodeFrom is None:
+            pen=wx.Pen('red',4)
+            dc.SetPen(pen)
+            dc.DrawLine(self.lineX,self.lineY,self.nodeFrom.x,self.nodeFrom.y)
 
     def OnEraseBack(self, event):
         pass # do nothing to avoid flicker
