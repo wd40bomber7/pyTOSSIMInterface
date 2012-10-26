@@ -44,36 +44,36 @@ class InjectionWindow(PrimaryFrame.MainWindow):
         label = wx.StaticText(self,wx.ID_ANY,"Source node")
         nameHSize.Add(label,0,wx.CENTER, 8);
         self.sourceBox = wx.ListBox(self,wx.ID_ANY,style=wx.LB_MULTIPLE)
-        nameHSize.Add(self.sourceBox,1,wx.CENTER, 8);
+        nameHSize.Add(self.sourceBox,1,wx.EXPAND | wx.CENTER, 8);
         
-        baseVSize.AddSizer(nameHSize, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
+        baseVSize.AddSizer(nameHSize, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
         baseVSize.AddSpacer(10,10);
 
         nameHSize = wx.BoxSizer(wx.VERTICAL)
         label = wx.StaticText(self,wx.ID_ANY,"Destination node")
         nameHSize.Add(label,0,wx.CENTER, 8);
         self.destinationBox = wx.ListBox(self,wx.ID_ANY,style=wx.LB_MULTIPLE)
-        nameHSize.Add(self.destinationBox,1,wx.CENTER, 8);
+        nameHSize.Add(self.destinationBox,1,wx.EXPAND | wx.CENTER, 8);
         
-        baseVSize.AddSizer(nameHSize, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
+        baseVSize.AddSizer(nameHSize, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
         baseVSize.AddSpacer(10,10);
         
         nameHSize = wx.BoxSizer(wx.VERTICAL)
         label = wx.StaticText(self,wx.ID_ANY,"%other% node")
         nameHSize.Add(label,0,wx.CENTER, 8);
         self.nodeBox = wx.ListBox(self,wx.ID_ANY)
-        nameHSize.Add(self.nodeBox,1,wx.CENTER, 8);
+        nameHSize.Add(self.nodeBox,1,wx.EXPAND | wx.CENTER, 8);
         
-        baseVSize.AddSizer(nameHSize, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
+        baseVSize.AddSizer(nameHSize, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
         baseVSize.AddSpacer(10,10);
 
         nameHSize = wx.BoxSizer(wx.VERTICAL)
         label = wx.StaticText(self,wx.ID_ANY,"%message%")
         nameHSize.Add(label,0,wx.CENTER, 8);
         self.messageText = wx.TextCtrl(self,wx.ID_ANY);
-        nameHSize.Add(self.messageText,1,wx.CENTER, 8);
+        nameHSize.Add(self.messageText,1,wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 8);
         
-        baseVSize.AddSizer(nameHSize, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP | wx.BOTTOM, 10)
+        baseVSize.AddSizer(nameHSize, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP | wx.BOTTOM, 10)
         baseVSize.AddSpacer(10,10);        
         #self.UpdateDisplay()
         
@@ -105,9 +105,9 @@ class InjectionWindow(PrimaryFrame.MainWindow):
         
         #rebuild node list
         for node in self.sim.simulationState.currentTopo.nodeDict:
-            self.sourceBox.Append(str(node.myId))
-            self.destinationBox.Append(str(node.myId))
-            self.nodeBox.Append(str(node.myId))
+            self.sourceBox.Append(str(node))
+            self.destinationBox.Append(str(node))
+            self.nodeBox.Append(str(node))
         
         return menuBar;
     
@@ -123,7 +123,7 @@ class InjectionWindow(PrimaryFrame.MainWindow):
     #For the inject menu
     def __OnInject(self, event):
         selInject = self.injectDict[event.GetId()]
-        self.sourceBox.se
+        #self.sourceBox.GetSelection()
         
 
 class Inject(object):

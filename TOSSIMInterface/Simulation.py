@@ -318,9 +318,11 @@ class SimState(object):
     def AttemptTopoLoad(self, topoFile):
         try:
             self.currentTopo = SimTopo(topoFile)
+            print "Loaded " + topoFile
             return True
         except:
             self.currentTopo = SimTopo()
+            print "Failed to load [" + topoFile + "]"
             return False
 
 class Sim(object):

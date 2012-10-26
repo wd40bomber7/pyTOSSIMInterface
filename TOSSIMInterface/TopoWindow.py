@@ -10,6 +10,7 @@ import PrimaryFrame;
 import Simulation
 import io
 import pygraphviz as pgv
+import re
 from Simulation import SimConnection
 
 class TopoWindow(PrimaryFrame.MainWindow):
@@ -96,11 +97,11 @@ class TopoWindow(PrimaryFrame.MainWindow):
             
         graph.node_attr['shape'] = 'point'
         graph.layout() #Uses neato algorithm to create a node network
-        memoryFile = io.BytesIO()
-        graph.draw(memoryFile,"plain")
-        
-        layoutData = memoryFile.getvalue().splitlines(True)
-        memoryFile.close()
+
+
+        drawnGraph = graph.draw(None,"plain")
+        #print drawnGraph
+        layoutData = drawnGraph.splitlines(True)
         nodeLayout = dict() #The location of the different nodes
         
         #These are used to abstract the positions of the data into a % of the screen space
@@ -108,7 +109,7 @@ class TopoWindow(PrimaryFrame.MainWindow):
         nodeSet = False
         
         for line in layoutData:
-            toParse = line.split(" ");
+            toParse = re.findall(r'\w+',line)
             if toParse[0] == "node":
                 n = Node(int(toParse[1]),float(toParse[2]),float(toParse[3]))
                 node = self.topoData.nodeDict[n.id]

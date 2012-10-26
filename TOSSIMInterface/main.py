@@ -36,8 +36,8 @@ parser.add_option("-c","--channels",dest="channels", default=None,
                   help="A comma separated list of channels");
 parser.add_option("-s","--start",action="store_true",dest="start", default=False,
                   help="Start the simulation immediately")
-parser.add_option("-w","--window",dest="window", default=None,
-                  help="Choose window to start immediately. Options: config,output,topo");
+parser.add_option("-w","--window",dest="window", default=None,action='append',
+                  help="Choose window to start immediately. Options: config,output,topo,inject");
 
 (options, args) = parser.parse_args(sys.argv)
 
@@ -55,7 +55,7 @@ if not options.noise is None:
 if not options.channels is None:
     programState.selectedOptions.channelList = options.channels.split(",")
 
-
+programState.simulationState.AttemptTopoLoad(programState.selectedOptions.topoFileName)
     
 
 app = wx.App(False)
@@ -72,15 +72,19 @@ programState.WindowBuilders["InjectionWindow"] = InjectionWindow.InjectionWindow
 
 if options.window is None:
     frame = ConfigWindow.ConfigWindow(programState);
-elif options.window == "config":
-    frame = ConfigWindow.ConfigWindow(programState);
-elif options.window == "output":
-    frame = OutputWindow.OutputWindow(programState);
-elif options.window == "topo":
-    frame = TopoWindow.TopoWindow(programState);
 else:
-    print "Invalid options for -w, type -h or --help to print help."
-    exit()
+    for window in options.window:
+        if window == "config":
+            frame = ConfigWindow.ConfigWindow(programState);
+        elif window == "output":
+            frame = OutputWindow.OutputWindow(programState);
+        elif window == "topo":
+            frame = TopoWindow.TopoWindow(programState);
+        elif window == "inject":
+            frame = InjectionWindow.InjectionWindow(programState);
+        else:
+            print "Invalid options for -w, type -h or --help to print help."
+            exit()
     
 
 if options.start:
@@ -88,12 +92,17 @@ if options.start:
 
 app.MainLoop()
 
-print "Quitted?"
+print "Queue death"
+
+if programState.simulationState.simIsRunning:
+    programState.simulationState.ioQueues.QueueOutput("Stopsimulation")
+    
+print "Quitting?"
 
 if programState.simulationState.ioReadWrite != None:
     programState.simulationState.ioReadWrite.StopThreads();
 
-
+print "Dead."
 
 
 

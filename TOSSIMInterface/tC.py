@@ -4,12 +4,10 @@ Created on Oct 14, 2012
 @author: wd40bomber7
 '''
 
-guipath = "main.py"
+guipath = "/home/fire/Desktop/TOSSIMInterface/main.py"
 noise = "no_noise.txt"
 topo = "topo.txt"
-
-
-
+channels = "Project2R,Project2RT,Project2F"
 
 
 #Code below this point should not be modified!
@@ -20,12 +18,16 @@ if len(sys.argv) <= 1:
     topoPath = os.path.abspath(topo);
     noisePath = os.path.abspath(noise);
     myPath = os.path.realpath(__file__)
-    subprocess.call([guipath,"--override-config",
-                     "--topo=\"" + topoPath + "\"",
-                     "--noise=\"" + noisePath + "\"",
-                     "--python-child=\"" + myPath + "\"",
+    p = subprocess.call(["python",guipath,
+                     "--window=output",
+                     "--topo=" + topoPath,
+                     "--noise=" + noisePath,
+                     "--python-child=" + myPath,
+                     "--channels=" + channels,
                      "--start"])
-    exit()
+    print "[] EXiting!"
+    sys.exit()
+    print "[] What?"
     
 import _TOSSIM
 import threading
@@ -45,11 +47,12 @@ t = Tossim([])
 r = t.radio()
 
 while True:
-    cmd = sys.stdin.readline().rstrip().rsplit(" ")
-    
+    input = sys.stdin.readline().rstrip()
+    cmd = input.rsplit(" ")
+    print "got"
     if cmd[0] == "Settopo":
         try:
-            f = open(cmd[1], "r")
+            f = open(input[len(cmd[0])+1:], "r")
             for line in f:
                 s = line.split()
                 if s:
@@ -67,7 +70,7 @@ while True:
             sys.stdout.flush()
             sys.exit(1)
         try:
-            noise = open("no_noise.txt", "r")
+            noise = open(input[len(cmd[0])+1:], "r")
             for line in noise:
                 str1 = line.strip()
                 if str1:
@@ -87,15 +90,24 @@ while True:
             nodeList.append(int(n))
         nodesLoaded = True
     elif cmd[0] == "Channellist":
-        channelList = cmd[1].rsplit(",")
-        for channel in channelList:
-            t.addChannel(channel, sys.stdout)
+        #print "CH: " + input
+        if len(cmd) >= 2:
+            
+            channelList = cmd[1].rsplit(",")
+            for channel in channelList:
+                t.addChannel(channel, sys.stdout)
         channelsLoaded = True
     elif cmd[0] == "Startsimulation":
         break
 
 if (not topoLoaded) or (not noiseLoaded) or (not nodesLoaded) or (not channelsLoaded):
-    print "_exception 4"
+    num = 0
+    num += 1 if topoLoaded else 0
+    num += 2 if noiseLoaded else 0
+    num += 4 if nodesLoaded else 0
+    num += 8 if channelsLoaded else 0
+    
+    print "_exception 4:" + str(num)
     sys.stdout.flush()
     sys.exit(1)
     
@@ -146,7 +158,7 @@ def handleInput():
         elif cmd[0] == "Stopsimulation":
             simulationRunning = False
             simulationPaused = False
-            return
+            sys.exit() #Close child
         elif cmd[0] == "Injectpacket":
             cmdBuffer.append((int(cmd[1]),oCmd[len(cmd[0] + " " + cmd[1]):]))
         

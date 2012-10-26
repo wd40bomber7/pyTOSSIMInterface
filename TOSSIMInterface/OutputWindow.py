@@ -139,8 +139,6 @@ class OutputWindow(PrimaryFrame.MainWindow):
             self.control.EndTextColour()
         
         
-
-        
     def UpdateDisplay(self, event):
         newData = self.sim.simulationState.messages.RetrieveFilteredList(self.selectedTypes,self.selectedChannels,self.selectedNodes,self.readPosition)
         #print "Updated display. [" + str(self.readPosition) + " -> " + str(newData[0]) + "]"
@@ -210,10 +208,10 @@ class OutputWindow(PrimaryFrame.MainWindow):
         self.selectedPreset = None;
         self.RebuildDisplay()
     def __OnDisplayTypes(self, event):
-        if self.displayNodeId:
-            self.displayNodeId = False
+        if self.displayType:
+            self.displayType = False
         else:
-            self.displayNodeId = True
+            self.displayType = True
         self.selectedPreset = None;
         self.RebuildDisplay()
     #For the presets Menu

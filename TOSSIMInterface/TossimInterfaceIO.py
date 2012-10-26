@@ -54,9 +54,10 @@ class InterfaceIO(object):
             if len(line) == 0:
 		break;
             self.sim.simulationState.ioQueues.QueueInput(line.rstrip());
+            print "RECEIVED: " + line.rstrip();
         print "stopped reading"
     def __handleOutput(self):
-        while self.__runInputOutput and (not self.p.stdin.closed):
+        while not self.p.stdin.closed:
             try:
                 time.sleep(1.0/100.0); #no faster than this
                 lines = self.sim.simulationState.ioQueues.LiquidateOutputQueue();
@@ -65,6 +66,8 @@ class InterfaceIO(object):
                 self.p.stdin.flush();
             except:
                 time.sleep(1.0/10000.0)
+            if (not self.__runInputOutput):
+		return; #Put this here instead of at the while so the flush runs at least one more time after a shut down is requested
             
     #Automatic sliding sleep time. Uses least amount of cpu time necessary
     def __processInput(self):

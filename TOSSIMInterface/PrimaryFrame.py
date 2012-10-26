@@ -114,9 +114,11 @@ class MainWindow(wx.Frame):
         
     def __WaitForCommand(self):
         start = time.time();
+        print "Wait entered"
         while (time.time() - start) < 3: #Wait 3 seconds. No longer
             cmds = self.sim.simulationState.ioQueues.LiquidateCommandQueue();
             if len(cmds) > 0:
+		print "Response: " + cmds[0]
                 return cmds[0];
             time.sleep(.1)
         print "Command timed out"
@@ -148,6 +150,7 @@ class MainWindow(wx.Frame):
         channelList = ""
         for channel in self.sim.selectedOptions.channelList:
             channelList += channel + ","
+        print "Channels: " + channelList
 
         self.sim.simulationState.simIsRunning = True;
         try:
@@ -164,14 +167,14 @@ class MainWindow(wx.Frame):
             self.sim.simulationState.ioReadWrite = None
             self.sim.simulationState.simIsRunning = False;
             self.displayError("Target was unable to load topo file. Make sure directory is not relative.");
-        return;
+	    return;
         self.sim.simulationState.ioQueues.QueueOutput("Setnoise " + self.sim.selectedOptions.noiseFileName)
         if self.__WaitForCommand() != "_noiseloaded success":
             self.sim.simulationState.ioReadWrite.StopThreads()
             self.sim.simulationState.ioReadWrite = None
             self.sim.simulationState.simIsRunning = False;
             self.displayError("Target was unable to load noise file. Make sure directory is not relative.");
-        return;
+	    return;
         self.sim.simulationState.ioQueues.QueueOutput("Startsimulation")
         for window in self.sim.openWindows:
             window.RebuildMenus()
