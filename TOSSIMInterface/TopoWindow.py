@@ -98,8 +98,8 @@ class TopoWindow(PrimaryFrame.MainWindow):
         graph.node_attr['shape'] = 'point'
         graph.layout() #Uses neato algorithm to create a node network
 
-	#graph.draw("x.png")
-	#graph.draw("x.txt","plain")
+        #graph.draw("x.png")
+        #graph.draw("x.txt","plain")
         drawnGraph = graph.draw(None,"plain")
         #print drawnGraph
         layoutData = drawnGraph.splitlines(True)

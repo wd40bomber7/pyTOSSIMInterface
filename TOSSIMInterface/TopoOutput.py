@@ -26,7 +26,7 @@ class TopoWindow(PrimaryFrame.MainWindow):
         super(TopoWindow,self).__init__(sim,"Topo Edit Window")
         #Variables
         self.topoData = None
-	self.readPosition = 0; #the line in the list of all received lines this node is reading at
+        self.readPosition = 0; #the line in the list of all received lines this node is reading at
         #Create menus
         self.topoExpirationMenu = wx.Menu()
         self.nodeMenu = wx.Menu()
@@ -52,7 +52,7 @@ class TopoWindow(PrimaryFrame.MainWindow):
         self.nodePanel.Bind(wx.EVT_MOTION, self.__OnMouseMove, self.nodePanel)
         
         #Update timer
-	self.timer = wx.Timer(self)
+        self.timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.UpdateDisplay, self.timer)
         self.timer.Start(100);
         
@@ -68,19 +68,19 @@ class TopoWindow(PrimaryFrame.MainWindow):
         
         self.expireDict = dict();
 
-	item = self.AddMenuItem(self.topoExpirationMenu, ".5", self.__OnTopoSelect)
-	self.expireDict[item.GetId()] = .5
-	item = self.AddMenuItem(self.topoExpirationMenu, "1", self.__OnTopoSelect)
-	self.expireDict[item.GetId()] = 1
-	item = self.AddMenuItem(self.topoExpirationMenu, "2", self.__OnTopoSelect)
-	self.expireDict[item.GetId()] = 2
-	item = self.AddMenuItem(self.topoExpirationMenu, "5", self.__OnTopoSelect)
-	self.expireDict[item.GetId()] = 5
+        item = self.AddMenuItem(self.topoExpirationMenu, ".5", self.__OnTopoSelect)
+        self.expireDict[item.GetId()] = .5
+        item = self.AddMenuItem(self.topoExpirationMenu, "1", self.__OnTopoSelect)
+        self.expireDict[item.GetId()] = 1
+        item = self.AddMenuItem(self.topoExpirationMenu, "2", self.__OnTopoSelect)
+        self.expireDict[item.GetId()] = 2
+        item = self.AddMenuItem(self.topoExpirationMenu, "5", self.__OnTopoSelect)
+        self.expireDict[item.GetId()] = 5
         item = self.AddMenuItem(self.topoExpirationMenu, "60", self.__OnTopoSelect)
-	self.expireDict[item.GetId()] = 60
-	
-	
-	RelayerTopo() #Do this here so every time your menus are forced to update so is the topo window
+        self.expireDict[item.GetId()] = 60
+        
+        
+        RelayerTopo() #Do this here so every time your menus are forced to update so is the topo window
         return menuBar;
         
     def WindowType(self):
@@ -92,7 +92,7 @@ class TopoWindow(PrimaryFrame.MainWindow):
         #First build the graphviz object with the list of connections
         graph=pgv.AGraph()
         onlyOneWay = list()
-	#Add each connection only once
+        #Add each connection only once
         for connection in self.topoData.connectionList:
             firstCheck = connection.fromNode * 1000 + connection.toNode
             secondCheck = connection.toNode * 1000 + connection.fromNode
@@ -104,7 +104,7 @@ class TopoWindow(PrimaryFrame.MainWindow):
         graph.node_attr['shape'] = 'point'
         graph.layout() #Uses neato algorithm to create a node network
 
-	#graph.draw("x.png") #This serves no purpose except for debugging
+        #graph.draw("x.png") #This serves no purpose except for debugging
         drawnGraph = graph.draw(None,"plain")
         #print drawnGraph
         layoutData = drawnGraph.splitlines(True)
@@ -146,37 +146,37 @@ class TopoWindow(PrimaryFrame.MainWindow):
             else:
                 node.y = (node.y - nodeMinY)/(nodeMaxY - nodeMinY) * .8 + .1
         #Find the best positions for the windows
-	for nodeId in nodeLayout:
+        for nodeId in nodeLayout:
             node = nodeLayout[nodeId]
-	    #Find the average location of the "cloud" of nearby nodes
-	    avgX = 0.0
-	    avgY = 0.0
-	    cloudCount = 0.0
-	    for otherId in nodeLayout:
-		if otherId == nodeId:
-		    continue
-		otherNode = nodeLayout[otherId]
-		avgX += otherNode.x
-		avgY += otherNode.y
-		cloudCount += 1
-	    avgX /= cloudCount
-	    avgY /= cloudCount
-	    #Now create a vector pointing away from that average position
-	    #this should point away from the majority of nearby nodes
-	    vectX = node.x-avgX + .0001 #we add .0001 to guarantee there is never length=0
-	    vectY = node.y-avgY
-	    #normalize the vector
-	    vectLength = ((vectX ** 2.0) + (vectY ** 2.0)) ** .5
-	    vectX /= vectLength
-	    vectY /= vectLength
-	    
-	    #The larger one decides the primary placement of the box
-	    if abs(vectX) > abs(vectY):
-		node.myWindow.x = -1 if vectX < 0 else 1
-		node.myWindow.y = vectY-.5
-	    else:
-		node.myWindow.x = vectX-.5
-		node.myWindow.y = -1 if vectY < 0 else 1
+            #Find the average location of the "cloud" of nearby nodes
+            avgX = 0.0
+            avgY = 0.0
+            cloudCount = 0.0
+            for otherId in nodeLayout:
+                if otherId == nodeId:
+                    continue
+                otherNode = nodeLayout[otherId]
+                avgX += otherNode.x
+                avgY += otherNode.y
+                cloudCount += 1
+            avgX /= cloudCount
+            avgY /= cloudCount
+            #Now create a vector pointing away from that average position
+            #this should point away from the majority of nearby nodes
+            vectX = node.x-avgX + .0001 #we add .0001 to guarantee there is never length=0
+            vectY = node.y-avgY
+            #normalize the vector
+            vectLength = ((vectX ** 2.0) + (vectY ** 2.0)) ** .5
+            vectX /= vectLength
+            vectY /= vectLength
+            
+            #The larger one decides the primary placement of the box
+            if abs(vectX) > abs(vectY):
+                node.myWindow.x = -1 if vectX < 0 else 1
+                node.myWindow.y = vectY-.5
+            else:
+                node.myWindow.x = vectX-.5
+                node.myWindow.y = -1 if vectY < 0 else 1
         
         self.nodePanel.connectedNodes = nodeLayout;
         self.Refresh()
@@ -184,7 +184,7 @@ class TopoWindow(PrimaryFrame.MainWindow):
         newData = self.sim.simulationState.messages.RetrieveFilteredList(list(),list(),list(),self.readPosition)
         self.readPosition = newData[0]
         #for message in newData[1]:
-	    
+            
     def LoadTopo(self):
         try:
             self.topoData = Simulation.SimTopo(self.currentTopoFile)
@@ -217,21 +217,21 @@ class TopoWindow(PrimaryFrame.MainWindow):
         '''
 class NodeWindow(object):
     def __init__(self,x=0,y=0):
-	#The x and y are -1 to 1 and are multiplied by the width/height and added to the node's position to find the top left corner of the window
-	self.x = x
-	self.y = y
-	self.messages = list()
-	self.posMessages = list()
-	self.posExpirations = list()
-	for i in xrange(0,10):
-	    self.posMessages.append("")
-	    self.posExpirations.append(0)
+        #The x and y are -1 to 1 and are multiplied by the width/height and added to the node's position to find the top left corner of the window
+        self.x = x
+        self.y = y
+        self.messages = list()
+        self.posMessages = list()
+        self.posExpirations = list()
+        for i in xrange(0,10):
+            self.posMessages.append("")
+            self.posExpirations.append(0)
     def mapMessagesToLines(self,dc):
-	highestPosMessage = -1
-	for i in xrange(0,10):
-	    if self.posExpirations[i] > 0:
-		highestPosMessage = i
-	
+        highestPosMessage = -1
+        for i in xrange(0,10):
+            if self.posExpirations[i] > 0:
+                highestPosMessage = i
+        
 class Node(object):
     def __init__ (self, node,x=0,y=0):
         self.x = x
@@ -325,14 +325,14 @@ class SketchWindow(wx.Panel):
             #Store the position for later use  
             self.nodePositions.append(Node(nodeId,x,y))
             
-	#Third draw windows
-	#process of drawing windows.
-	#1. Break text into lines based off of allowed length
-	#2. Draw a solid white background for the total actual lines
-	#3. Draw a thick border including a thin title bar
-	#4. Draw a think border between slot messages and regular messages 
-	#5. Color alternating message boxes in a grey color
-	#6. Draw messages in black over the background
+        #Third draw windows
+        #process of drawing windows.
+        #1. Break text into lines based off of allowed length
+        #2. Draw a solid white background for the total actual lines
+        #3. Draw a thick border including a thin title bar
+        #4. Draw a think border between slot messages and regular messages 
+        #5. Color alternating message boxes in a grey color
+        #6. Draw messages in black over the background
 
     def OnEraseBack(self, event):
         pass # do nothing to avoid flicker

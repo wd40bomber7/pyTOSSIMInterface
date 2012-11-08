@@ -51,7 +51,7 @@ class MessagePool(object):
         self.__storedMessages = list(); #collections.deque();
         #self.__bufferSlider = 0 #Used to fool outsiders into thinking a buffer has infinite depth when it's fixed depth
     def ClearAll(self):
-	self.__storedMessages = list();
+        self.__storedMessages = list();
     def ParseAndAppend(self, unparsedMessage):
         message = Message();
         cutup = unparsedMessage.rsplit(" ")
@@ -75,16 +75,16 @@ class MessagePool(object):
             message.messageText = unparsedMessage[len(cutup[0])+len(cutup[1])+len(cutup[2])+3:]
         
         if len(message.messageText) > 1:
-	    if message.messageText[0] == "_":
-		parts = message.messageText.split("_")
-		try:
-		    message.topoSlot = int(parts[0])
-		except:
-		    message.topoSlot = -1
-		message.topoMessage = True
-	    else:
-		message.topoMessage = False
-		
+            if message.messageText[0] == "_":
+                parts = message.messageText.split("_")
+                try:
+                    message.topoSlot = int(parts[0])
+                except:
+                    message.topoSlot = -1
+                message.topoMessage = True
+            else:
+                message.topoMessage = False
+                
         
         self.messagesLock.acquire()
         #due to buffer mechanic, it is currently infinitly large.
@@ -101,7 +101,7 @@ class MessagePool(object):
         for i in range(readPosition,newReadPosition) :
             message = self.__storedMessages[i]
             if message.topoMessage != topoMessages:
-		continue;
+                continue;
             if message.messageType in allowedTypes:
                 continue
             if message.nodeId in allowedNodes:
