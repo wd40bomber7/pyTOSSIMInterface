@@ -24,6 +24,8 @@ class Message(object):
         self.nodeId = 0;
         self.channelList = []; #one message can have multiple channels
         self.messageType = MessageType.Debug;
+        self.topoMessage = False;
+        self.topoSlot = 0;
         
     def ContainsChannelFromList(self,channelList):
         '''
@@ -48,7 +50,8 @@ class MessagePool(object):
         self.messagesLock = threading.RLock()
         self.__storedMessages = list(); #collections.deque();
         #self.__bufferSlider = 0 #Used to fool outsiders into thinking a buffer has infinite depth when it's fixed depth
-        
+    def ClearAll(self):
+	self.__storedMessages = list();
     def ParseAndAppend(self, unparsedMessage):
         message = Message();
         cutup = unparsedMessage.rsplit(" ")
@@ -71,6 +74,18 @@ class MessagePool(object):
         if len(cutup) > 3:
             message.messageText = unparsedMessage[len(cutup[0])+len(cutup[1])+len(cutup[2])+3:]
         
+        if len(message.messageText) > 1:
+	    if message.messageText[0] == "_":
+		parts = message.messageText.split("_")
+		try:
+		    message.topoSlot = int(parts[0])
+		except:
+		    message.topoSlot = -1
+		message.topoMessage = True
+	    else:
+		message.topoMessage = False
+		
+        
         self.messagesLock.acquire()
         #due to buffer mechanic, it is currently infinitly large.
         #if len(self.__storedMessages) >= 2000: #current max buffer
@@ -79,17 +94,19 @@ class MessagePool(object):
         self.messagesLock.release()
         return message
         
-    def RetrieveFilteredList(self,allowedTypes,allowedChannels,allowedNodes,readPosition=0):
+    def RetrieveFilteredList(self,allowedTypes,allowedChannels,allowedNodes,readPosition=0,topoMessages=False):
         filteredList = list()
         self.messagesLock.acquire()
         newReadPosition = len(self.__storedMessages)
         for i in range(readPosition,newReadPosition) :
             message = self.__storedMessages[i]
-            if not (message.messageType in allowedTypes):
+            if message.topoMessage != topoMessages:
+		continue;
+            if message.messageType in allowedTypes:
                 continue
-            if not (message.nodeId in allowedNodes):
+            if message.nodeId in allowedNodes:
                 continue
-            if message.ContainsChannelFromList(allowedChannels):
+            if not message.ContainsChannelFromList(allowedChannels):
                 filteredList.append(message);
 
         self.messagesLock.release()

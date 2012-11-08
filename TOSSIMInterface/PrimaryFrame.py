@@ -35,7 +35,7 @@ class MainWindow(wx.Frame):
         self.sim.openWindows.append(self)
         
         #self.RebuildMenus();
-        self.Bind(wx.EVT_CLOSE, self.__OnClose, self)
+        self.Bind(wx.EVT_CLOSE, self.OnClose, self)
 
         #add an icon for cool factor
         self.frameIcon.seek(0);
@@ -107,7 +107,7 @@ class MainWindow(wx.Frame):
                 menu.RemoveItem(item);
         print "Menus cleaned"
 
-    def __OnClose(self, event):
+    def OnClose(self, event):
         self.sim.SavePresets(); #incase you make changes to presets save them
         self.sim.openWindows.remove(self);
         self.Destroy();
@@ -125,6 +125,7 @@ class MainWindow(wx.Frame):
         return "";
     
     def StartSimulation(self):
+	self.sim.simulationState.messages.ClearAll()
         if len(self.sim.selectedOptions.childPythonName) <= 0:
             self.displayError("You must set a python file to run in the config window.")
             return
@@ -178,6 +179,8 @@ class MainWindow(wx.Frame):
         self.sim.simulationState.ioQueues.QueueOutput("Startsimulation")
         for window in self.sim.openWindows:
             window.RebuildMenus()
+            if window.WindowType() == 1:
+		window.RebuildDisplay()
     def __OnSimulationStart(self, event):
         self.StartSimulation()
         

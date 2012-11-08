@@ -4,12 +4,13 @@ Created on Oct 12, 2012
 @author: wd40bomber7
 '''
 
-
 import wx.richtext;
 import PrimaryFrame;
 import Simulation
-from Messages import MessageType
+import time
+import cProfile
 
+from Messages import MessageType
 
 class OutputWindow(PrimaryFrame.MainWindow):
     '''
@@ -30,9 +31,9 @@ class OutputWindow(PrimaryFrame.MainWindow):
         self.displayChannel = False;
         self.displayType = True;
         
+        self.defaultPreset = None;
         self.selectedPreset = None;
         self.displayedText = ""
-        
 
         #setup
         super(OutputWindow,self).__init__(sim,"Output Window")
@@ -63,10 +64,16 @@ class OutputWindow(PrimaryFrame.MainWindow):
         self.menuBar.Append(self.presetMenu,"Presets");
         
         self.RebuildMenus()
+        if self.defaultPreset is None:
+            self.__buildPreset("default")
+            print "Built preset"
+        else:
+            self.__loadPreset(self.defaultPreset)
+            self.RebuildMenus()
         
         self.timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.UpdateDisplay, self.timer)
-        self.timer.Start(250);
+        self.timer.Start(100);
         self.UpdateDisplay(None) #force initial update
         
         self.Show();
@@ -84,18 +91,18 @@ class OutputWindow(PrimaryFrame.MainWindow):
         self.presetDict = dict();
         
         #type menu
-        self.testerValue = self.AddMenuItem(self.typeMenu, "Debug", self.__OnTypeDebug, MessageType.Debug in self.selectedTypes)
-        self.AddMenuItem(self.typeMenu, "Error", self.__OnTypeError, MessageType.Error in self.selectedTypes)
+        self.testerValue = self.AddMenuItem(self.typeMenu, "Debug", self.__OnTypeDebug,not MessageType.Debug in self.selectedTypes)
+        self.AddMenuItem(self.typeMenu, "Error", self.__OnTypeError,not MessageType.Error in self.selectedTypes)
         
         #channelsMenu
         self.channelCount = len(self.sim.selectedOptions.channelList)
         for channel in self.sim.selectedOptions.channelList:
-            item = self.AddMenuItem(self.channelsMenu, channel, self.__OnChannel, channel in self.selectedChannels)
+            item = self.AddMenuItem(self.channelsMenu, channel, self.__OnChannel, not channel in self.selectedChannels)
             self.channelDict[item.GetId()] = channel
         
         #nodesMenu
         for node in self.sim.simulationState.currentTopo.nodeDict:
-            item = self.AddMenuItem(self.nodesMenu, "Node " + str(node), self.__OnNode, node in self.selectedNodes)
+            item = self.AddMenuItem(self.nodesMenu, "Node " + str(node), self.__OnNode, not node in self.selectedNodes)
             self.nodeDict[item.GetId()] = node
 
         #self.nodesMenu.AppendSeparator();
@@ -109,8 +116,11 @@ class OutputWindow(PrimaryFrame.MainWindow):
         
         #presetMenu
         for preset in self.sim.savedPresets.outputPresets:
-            item = self.AddMenuItem(self.presetMenu, preset.name, self.__OnPreset, preset == self.selectedPreset)
-            self.presetDict[item.GetId()] = preset
+	    if preset.name != "default":
+		item = self.AddMenuItem(self.presetMenu, preset.name, self.__OnPreset, preset == self.selectedPreset)
+		self.presetDict[item.GetId()] = preset
+	    else:
+		self.defaultPreset = preset;
         self.presetMenu.AppendSeparator();
         self.AddMenuItem(self.presetMenu, "Remove Existing Preset", self.__OnPresetRemove)
         self.AddMenuItem(self.presetMenu, "Add Current as New Preset", self.__OnPresetAdd)
@@ -118,35 +128,53 @@ class OutputWindow(PrimaryFrame.MainWindow):
         return menuBar;
     
     def __RenderMessage(self, message):
-        rendered = ""
+	start = time.clock()
+	renderList = list()
         if self.displayType:
-            rendered += "DEBUG " if (message.messageType == MessageType.Debug) else "ERROR "
+            renderList.append("DEBUG" if (message.messageType == MessageType.Debug) else "ERROR")
         if self.displayChannel:
-            rendered += "[" + message.channelList[0] + "] "
+            renderList.append(" [")
+            renderList.append(message.channelList[0])
+            renderList.append("]")
         if self.displayNodeId:
-            rendered += " (" + str(message.nodeId) + ") "
-        rendered = rendered[:-1] + ": " + message.messageText.rstrip(); #render color one day?
-        #if len(self.displayedText) > 0:
-            #rendered = "\n" + rendered
+	    renderList.append(" (")
+	    renderList.append(str(message.nodeId))
+	    renderList.append(")")
+        renderList.append(": ")
+        renderList.append(message.messageText.rstrip()); #render color one day?
+        rendered = ''.join(renderList);
         
-        self.displayedText += rendered
         if (message.messageType != MessageType.Debug):
             self.control.BeginTextColour(wx.Color(255,0,0))
         self.control.InsertionPoint = 100000
+        second = time.clock()
         self.control.WriteText(rendered);
+        third  = time.clock()
         self.control.ShowPosition(self.control.GetLastPosition());
         if (message.messageType != MessageType.Debug):
             self.control.EndTextColour()
+        last = time.clock()
+        return [second-start,third-second,last-third]
         
-        
+    
     def UpdateDisplay(self, event):
+	simple = [0,0,0]
         newData = self.sim.simulationState.messages.RetrieveFilteredList(self.selectedTypes,self.selectedChannels,self.selectedNodes,self.readPosition)
         #print "Updated display. [" + str(self.readPosition) + " -> " + str(newData[0]) + "]"
         self.readPosition = newData[0]
         for message in newData[1]:
-            self.__RenderMessage(message);
+            o = self.__RenderMessage(message)
+            simple[0] += o[0]
+            simple[1] += o[1]
+            simple[2] += o[2]
+            
         if self.channelCount != len(self.sim.selectedOptions.channelList):
+	    print "[0] Rebuilt menus"
             self.RebuildMenus()
+	if (len(newData[1]) > 0):
+	    print "[1]: Added " + str(len(newData[1])) + " new messages in " + str(simple[0]) + ":" + str(simple[1]) + ":" + str(simple[2])
+	
+	
     def RebuildDisplay(self):
 	self.displayedText = ""
 	self.control.Value = ""
@@ -156,7 +184,12 @@ class OutputWindow(PrimaryFrame.MainWindow):
     def WindowType(self):
         return 1
     
-    #For the type Menu
+    #Save default preset
+    def OnClose(self, event):
+    	self.__overWritePreset(self.defaultPreset)
+    	#finish clean up
+    	super(OutputWindow,self).OnClose(event)
+        #For the type Menu
     def __OnTypeDebug(self, event):
         if MessageType.Debug in self.selectedTypes:
             self.selectedTypes.remove(MessageType.Debug)
@@ -218,27 +251,22 @@ class OutputWindow(PrimaryFrame.MainWindow):
     def __OnPreset(self, event):
         if self.selectedPreset != self.presetDict[event.GetId()]:
             self.selectedPreset = self.presetDict[event.GetId()]
-            self.selectedChannels = self.selectedPreset.selectedChannels[:]
-            self.selectedTypes = self.selectedPreset.selectedTypes[:]
-            self.selectedNodes = self.selectedPreset.selectedNodes[:]
-            self.displayChannel = self.selectedPreset.displayChannel
-            self.displayNodeId = self.selectedPreset.displayNodeId;
-            self.displayType = self.selectedPreset.displayType;
+	    self.__loadPreset(self.selectedPreset)
             self.RebuildMenus();
 	    self.RebuildDisplay()
     def __OnPresetRemove(self, event):  
         presetsList = list();
         presetsDict = dict();
         for preset in self.sim.savedPresets.outputPresets:
-            presetsList.append(preset.name);
-            presetsDict[preset.name] = preset;
+	    if preset.name != "default":
+		presetsList.append(preset.name);
+		presetsDict[preset.name] = preset;
         dlg = wx.SingleChoiceDialog(self, "Choose a preset to remove.", "Preset List",presetsList, wx.CHOICEDLG_STYLE)
  
         if dlg.ShowModal() == wx.ID_OK:
             self.sim.savedPresets.outputPresets.remove(presetsDict[dlg.GetStringSelection()]);
         dlg.Destroy()
         self.RebuildMenus();
-        #self.Sim.SavePresets();
         
     def __OnPresetAdd(self, event):
         dialog = wx.TextEntryDialog(None,"Choose a name for the preset:", "Preset Name","");
@@ -247,18 +275,35 @@ class OutputWindow(PrimaryFrame.MainWindow):
             for preset in self.sim.savedPresets.outputPresets:
                 if name == preset.name:
                     self.displayError("Preset names must be unique.");
-                    dialog.Destroy();
+                    dialog.Destroy()
                     return;
-            newPreset = Simulation.SimOutput()
-            newPreset.selectedChannels = self.selectedChannels[:]
-            newPreset.selectedNodes = self.selectedNodes[:]
-            newPreset.selectedTypes = self.selectedTypes[:]
-            newPreset.displayChannel = self.displayChannel;
-            newPreset.displayNodeId = self.displayNodeId;
-            newPreset.displayType = self.displayType;
-            newPreset.name = name;
-            self.sim.savedPresets.outputPresets.append(newPreset);
-            self.RebuildMenus();
+            self.__buildPreset(name)
+            #TODO: Rebuild menus of all output windows here and elsewhere
+            self.RebuildMenus()
         dialog.Destroy()
-        #self.Sim.SavePresets();
+        
+    def __buildPreset(self, name):
+        newPreset = Simulation.SimOutput()
+        newPreset.selectedChannels = self.selectedChannels[:]
+        newPreset.selectedNodes = self.selectedNodes[:]
+        newPreset.selectedTypes = self.selectedTypes[:]
+        newPreset.displayChannel = self.displayChannel;
+        newPreset.displayNodeId = self.displayNodeId;
+        newPreset.displayType = self.displayType;
+        newPreset.name = name;
+        self.sim.savedPresets.outputPresets.append(newPreset);
+    def __loadPreset(self, preset):
+    	self.selectedChannels = preset.selectedChannels[:]
+    	self.selectedTypes = preset.selectedTypes[:]
+    	self.selectedNodes = preset.selectedNodes[:]
+    	self.displayChannel = preset.displayChannel
+    	self.displayNodeId = preset.displayNodeId;
+    	self.displayType = preset.displayType;
+    def __overWritePreset(self, toReplace):
+    	toReplace.selectedChannels = self.selectedChannels[:]
+    	toReplace.selectedNodes = self.selectedNodes[:]
+    	toReplace.selectedTypes = self.selectedTypes[:]
+    	toReplace.displayChannel = self.displayChannel;
+    	toReplace.displayNodeId = self.displayNodeId;
+    	toReplace.displayType = self.displayType;
         

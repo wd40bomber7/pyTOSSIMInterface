@@ -1,5 +1,5 @@
 '''
-Created on Oct 15, 2012
+Created on Nov 6, 2012
 
 @author: wd40bomber7
 '''
@@ -26,15 +26,15 @@ class TopoWindow(PrimaryFrame.MainWindow):
         super(TopoWindow,self).__init__(sim,"Topo Edit Window")
         #Variables
         self.topoData = None
-
+	self.readPosition = 0; #the line in the list of all received lines this node is reading at
         #Create menus
-        self.topoFileMenu = wx.Menu()
+        self.topoExpirationMenu = wx.Menu()
         self.nodeMenu = wx.Menu()
         #Register menus
-        self.RegisterMenu(self.topoFileMenu);
+        self.RegisterMenu(self.topoExpirationMenu);
         #self.RegisterMenu(self.nodeMenu);
         #Append menus
-        self.menuBar.Append(self.topoFileMenu,"Topo Files")
+        self.menuBar.Append(self.topoExpirationMenu,"Message Expiration")
         #self.menuBar.Append(self.nodeMenu,"Nodes")
         
         self.RebuildMenus()
@@ -50,7 +50,11 @@ class TopoWindow(PrimaryFrame.MainWindow):
         self.nodePanel.Bind(wx.EVT_LEFT_UP, self.__OnMouseLeftUp, self.nodePanel)
         self.nodePanel.Bind(wx.EVT_LEAVE_WINDOW, self.__OnMouseLeave, self.nodePanel)
         self.nodePanel.Bind(wx.EVT_MOTION, self.__OnMouseMove, self.nodePanel)
-        self.nodePanel.Bind(wx.EVT_RIGHT_DOWN, self.__OnMouseRightClick, self.nodePanel)
+        
+        #Update timer
+	self.timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.UpdateDisplay, self.timer)
+        self.timer.Start(100);
         
         self.Show();
         
@@ -62,24 +66,25 @@ class TopoWindow(PrimaryFrame.MainWindow):
         '''
         menuBar = super(TopoWindow,self).RebuildMenus();
         
-        self.topoDict = dict();
-        #Make this an open/save/save as/new menu setup. Open should be a submenu
-        #presetMenu
-        for i in range(len(self.sim.savedPresets.topoHistory)-1,-1,-1):
-            topoFile = self.sim.savedPresets.topoHistory[i]
-            item = self.AddMenuItem(self.topoFileMenu, topoFile, self.__OnTopoSelect)
-            self.topoDict[item.GetId()] = topoFile
-        self.topoFileMenu.AppendSeparator();
-        self.AddMenuItem(self.topoFileMenu, "Browse", self.__OnTopoBrowse)
-        self.AddMenuItem(self.topoFileMenu, "New", self.__OnTopoNew)
-        
-        self.AddMenuItem(self.nodeMenu, "Delete Node", self.__OnNodeRemove)
-        self.AddMenuItem(self.nodeMenu, "Add Node", self.__OnNodeAdd)
-        
+        self.expireDict = dict();
+
+	item = self.AddMenuItem(self.topoExpirationMenu, ".5", self.__OnTopoSelect)
+	self.expireDict[item.GetId()] = .5
+	item = self.AddMenuItem(self.topoExpirationMenu, "1", self.__OnTopoSelect)
+	self.expireDict[item.GetId()] = 1
+	item = self.AddMenuItem(self.topoExpirationMenu, "2", self.__OnTopoSelect)
+	self.expireDict[item.GetId()] = 2
+	item = self.AddMenuItem(self.topoExpirationMenu, "5", self.__OnTopoSelect)
+	self.expireDict[item.GetId()] = 5
+        item = self.AddMenuItem(self.topoExpirationMenu, "60", self.__OnTopoSelect)
+	self.expireDict[item.GetId()] = 60
+	
+	
+	RelayerTopo() #Do this here so every time your menus are forced to update so is the topo window
         return menuBar;
         
     def WindowType(self):
-        return 3
+        return 5
     def RelayerTopo(self):
         '''
         Determines the draw positions of all nodes
@@ -87,6 +92,7 @@ class TopoWindow(PrimaryFrame.MainWindow):
         #First build the graphviz object with the list of connections
         graph=pgv.AGraph()
         onlyOneWay = list()
+	#Add each connection only once
         for connection in self.topoData.connectionList:
             firstCheck = connection.fromNode * 1000 + connection.toNode
             secondCheck = connection.toNode * 1000 + connection.fromNode
@@ -98,8 +104,7 @@ class TopoWindow(PrimaryFrame.MainWindow):
         graph.node_attr['shape'] = 'point'
         graph.layout() #Uses neato algorithm to create a node network
 
-	#graph.draw("x.png")
-	#graph.draw("x.txt","plain")
+	#graph.draw("x.png") #This serves no purpose except for debugging
         drawnGraph = graph.draw(None,"plain")
         #print drawnGraph
         layoutData = drawnGraph.splitlines(True)
@@ -109,8 +114,9 @@ class TopoWindow(PrimaryFrame.MainWindow):
         nodeMinX = nodeMaxX = nodeMinY = nodeMaxY = 0
         nodeSet = False
         
+        #Parse the plain text file only for node positions.
         for line in layoutData:
-            toParse = re.findall("[\.\-\w]+",line)
+            toParse = re.findall("[\.\-\w]+",line) #Split on spaces, - or . Combine consecutive delimiters
             if len(toParse) > 3 and toParse[0] == "node":
                 n = Node(int(toParse[1]),float(toParse[2]),float(toParse[3]))
                 node = self.topoData.nodeDict[n.id]
@@ -127,6 +133,8 @@ class TopoWindow(PrimaryFrame.MainWindow):
                     nodeMinY = min(nodeMinY,n.y)
                     nodeMaxY = max(nodeMaxY,n.y)
                 nodeLayout[n.id] = n
+        #Use collected information to normalize nodes to be between .1 and .9 position
+        #This means they'll be between 10% of the width/height and 90% when being displayed
         for nodeId in nodeLayout:
             node = nodeLayout[nodeId]
             if nodeMinX == nodeMaxX:
@@ -137,15 +145,46 @@ class TopoWindow(PrimaryFrame.MainWindow):
                 node.y = .5
             else:
                 node.y = (node.y - nodeMinY)/(nodeMaxY - nodeMinY) * .8 + .1
-            
-                
+        #Find the best positions for the windows
+	for nodeId in nodeLayout:
+            node = nodeLayout[nodeId]
+	    #Find the average location of the "cloud" of nearby nodes
+	    avgX = 0.0
+	    avgY = 0.0
+	    cloudCount = 0.0
+	    for otherId in nodeLayout:
+		if otherId == nodeId:
+		    continue
+		otherNode = nodeLayout[otherId]
+		avgX += otherNode.x
+		avgY += otherNode.y
+		cloudCount += 1
+	    avgX /= cloudCount
+	    avgY /= cloudCount
+	    #Now create a vector pointing away from that average position
+	    #this should point away from the majority of nearby nodes
+	    vectX = node.x-avgX + .0001 #we add .0001 to guarantee there is never length=0
+	    vectY = node.y-avgY
+	    #normalize the vector
+	    vectLength = ((vectX ** 2.0) + (vectY ** 2.0)) ** .5
+	    vectX /= vectLength
+	    vectY /= vectLength
+	    
+	    #The larger one decides the primary placement of the box
+	    if abs(vectX) > abs(vectY):
+		node.myWindow.x = -1 if vectX < 0 else 1
+		node.myWindow.y = vectY-.5
+	    else:
+		node.myWindow.x = vectX-.5
+		node.myWindow.y = -1 if vectY < 0 else 1
+        
         self.nodePanel.connectedNodes = nodeLayout;
         self.Refresh()
-    def SaveTopo(self):
-        #try:
-            self.topoData.WriteTopoFile()
-        #except:
-        #    self.displayError("Failed to save topo file! Changes not saved.")
+    def UpdateDisplay(self, event):
+        newData = self.sim.simulationState.messages.RetrieveFilteredList(list(),list(),list(),self.readPosition)
+        self.readPosition = newData[0]
+        #for message in newData[1]:
+	    
     def LoadTopo(self):
         try:
             self.topoData = Simulation.SimTopo(self.currentTopoFile)
@@ -155,142 +194,59 @@ class TopoWindow(PrimaryFrame.MainWindow):
             self.displayError("Unable to load selected topo file.");
             return;
         self.RelayerTopo()
-    #browse buttons
-    def __OnNodeAdd(self, event):
-        '''
-        stub
-        '''
-    def __OnNodeRemove(self, event):
-        '''
-        stub
-        '''
-    def __OnTopoSelect(self, event):
-        self.currentTopoFile = self.topoDict[event.GetId()]
-        self.LoadTopo()
-        
-    def __OnTopoBrowse(self, event):
-        dlg = wx.FileDialog(
-            self, message="Choose a file",
-            wildcard="Text files (*.txt)|*.txt|All files (*.*)|*.*",
-            style=wx.OPEN)
-        if dlg.ShowModal() == wx.ID_OK:
-            self.currentTopoFile = dlg.GetPath()
-            self.LoadTopo()
-            #self.Sim.SavePresets()
-        dlg.Destroy()
-    def __OnTopoNew(self, event):
-        dlg = wx.FileDialog(
-            self, message="Choose a filename",
-            wildcard="Text files (*.txt)|*.txt|All files (*.*)|*.*",
-            style=wx.SAVE)
-        if dlg.ShowModal() == wx.ID_OK:
-            self.currentTopoFile = dlg.GetPath()
-            try:
-                self.topoData = Simulation.SimTopo()
-                self.topoData.topoFileName = self.currentTopoFile
-                self.topoData.AddConnection(1, 2)
-                self.topoData.AddConnection(2, 1)
-                self.topoData.WriteTopoFile()
-                self.sim.savedPresets.addTopo(self.currentTopoFile)
-                self.RebuildMenus()
-            except:
-                self.topoData = None
-                self.displayError("Unable to create topo file there.")
-                return;
             
-            self.RelayerTopo()
-        dlg.Destroy()        
     #Editing handlers
     def __OnMouseMove(self, event):
-        if not self.nodePanel.nodeFrom is None:
-            self.nodePanel.lineX = event.GetX()
-            self.nodePanel.lineY = event.GetY()
-            self.Refresh()
+        '''
+        stub
+        '''
         
     def __OnMouseLeave(self, event):
-        self.nodePanel.nodeFrom = None
-        self.Refresh()
+        '''
+        stub
+        '''
         
     def __OnMouseLeftDown(self, event):
-        #print "Click at (" + str(event.GetX()) + "," + str(event.GetY()) + ")"
-        if self.topoData is None:
-            return
-        
-        selectedNode = None
-        for pos in self.nodePanel.nodePositions:
-            distanceSquared = (pos.x-event.GetX()) ** 2 + (pos.y-event.GetY()) ** 2
-            if distanceSquared < 80:
-                selectedNode = pos
-        if selectedNode is None:
-            return
-        self.nodePanel.nodeFrom = selectedNode
-        self.nodePanel.lineX = event.GetX()
-        self.nodePanel.lineY = event.GetY()
+        '''
+        stub
+        '''
         
     def __OnMouseLeftUp(self, event):
-        if not self.nodePanel.nodeFrom is None:
-            selectedNode = None
-            for pos in self.nodePanel.nodePositions:
-                distanceSquared = (pos.x-event.GetX()) ** 2 + (pos.y-event.GetY()) ** 2
-                if distanceSquared < 80:
-                    selectedNode = pos
-            if (not selectedNode is None) and (selectedNode.id != self.nodePanel.nodeFrom.id):
-                toSimNode = self.topoData.nodeDict[selectedNode.id]
-                fromSimNode = self.topoData.nodeDict[self.nodePanel.nodeFrom.id]
-                self.topoData.connectionList.append(SimConnection(fromSimNode.myId,toSimNode.myId))
-                self.topoData.connectionList.append(SimConnection(toSimNode.myId,fromSimNode.myId))
-                toSimNode.connectNodes.append(fromSimNode)
-                fromSimNode.connectNodes.append(toSimNode)
-            elif not selectedNode is None:
-                print "Adding stand alone node"
-                self.topoData.AddNode(self.topoData.nodeDict[self.nodePanel.nodeFrom.id])
-            
-            self.nodePanel.nodeFrom = None
-            self.RelayerTopo()
-            self.SaveTopo()
-        
-    def __OnMouseRightClick(self, event):
-        #First see if they're removing a node
-        if self.topoData is None:
-            return
-        selectedNode = None
-        for pos in self.nodePanel.nodePositions:
-            distanceSquared = (pos.x-event.GetX()) ** 2 + (pos.y-event.GetY()) ** 2
-            if distanceSquared < 80:
-                selectedNode = pos
-        if not selectedNode is None:
-            #Remove from connections list
-            self.topoData.RemoveNode(selectedNode.id)
-            self.RelayerTopo()
-            self.SaveTopo()
-            return
-        
-        
-        p = Node(0,event.GetX(),event.GetY())
-        selectedConnection = None
-        for line in self.nodePanel.nodeConnections:
-            dist = line.distToNode(p)
-            if dist < 10:
-                selectedConnection = line;
-        if selectedConnection is None:
-            return;
-        self.topoData.RemoveConnection(selectedConnection.a.id, selectedConnection.b.id)
-        self.RelayerTopo()
-        self.SaveTopo()
-        
+        '''
+        stub
+        '''
+class NodeWindow(object):
+    def __init__(self,x=0,y=0):
+	#The x and y are -1 to 1 and are multiplied by the width/height and added to the node's position to find the top left corner of the window
+	self.x = x
+	self.y = y
+	self.messages = list()
+	self.posMessages = list()
+	self.posExpirations = list()
+	for i in xrange(0,10):
+	    self.posMessages.append("")
+	    self.posExpirations.append(0)
+    def mapMessagesToLines(self,dc):
+	highestPosMessage = -1
+	for i in xrange(0,10):
+	    if self.posExpirations[i] > 0:
+		highestPosMessage = i
+	
 class Node(object):
     def __init__ (self, node,x=0,y=0):
         self.x = x
         self.y = y
         self.id = node
         self.connections = list()
+        self.myWindow = NodeWindow()
+
 class Line(object):
     def __init__(self,a,b):
         self.a = a
         self.b = b
         
     def distToNode(self, n):
-        #Find minimum distance from a point to this node. Equation from Stack overflow
+        #Find minimum distance from a line to this node. Equation from Stack overflow
         self.n = n
         lengthSquared = (self.a.x-self.b.x) ** 2 + (self.a.y-self.b.y) ** 2
         if lengthSquared == 0.0:
@@ -308,7 +264,6 @@ class Line(object):
 class SketchWindow(wx.Panel):
 
     def __init__ (self, parent,ID):
-
         wx.Panel.__init__(self, parent, ID)
         
         n = Node(node=Simulation.SimNode(5))
@@ -370,11 +325,14 @@ class SketchWindow(wx.Panel):
             #Store the position for later use  
             self.nodePositions.append(Node(nodeId,x,y))
             
-        #Finally draw line
-        if not self.nodeFrom is None:
-            pen=wx.Pen('red',4)
-            dc.SetPen(pen)
-            dc.DrawLine(self.lineX,self.lineY,self.nodeFrom.x,self.nodeFrom.y)
+	#Third draw windows
+	#process of drawing windows.
+	#1. Break text into lines based off of allowed length
+	#2. Draw a solid white background for the total actual lines
+	#3. Draw a thick border including a thin title bar
+	#4. Draw a think border between slot messages and regular messages 
+	#5. Color alternating message boxes in a grey color
+	#6. Draw messages in black over the background
 
     def OnEraseBack(self, event):
         pass # do nothing to avoid flicker

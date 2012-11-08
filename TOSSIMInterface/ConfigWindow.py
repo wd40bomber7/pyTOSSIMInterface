@@ -169,7 +169,6 @@ class ConfigWindow(PrimaryFrame.MainWindow):
         if dlg.ShowModal() == wx.ID_OK:
             self.topoFileTextbox.Value = dlg.GetPath()
             self.sim.selectedOptions.topoFileName = self.topoFileTextbox.Value
-            #self.Sim.SavePresets()
         dlg.Destroy()
     def __OnNoiseBrowse(self, event):
         dlg = wx.FileDialog(

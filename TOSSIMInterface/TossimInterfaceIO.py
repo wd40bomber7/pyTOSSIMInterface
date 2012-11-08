@@ -52,9 +52,9 @@ class InterfaceIO(object):
         while self.__runInputOutput and (not self.p.stdout.closed):
             line = self.p.stdout.readline()
             if len(line) == 0:
-		break;
+		      break;
             self.sim.simulationState.ioQueues.QueueInput(line.rstrip());
-            print "RECEIVED: " + line.rstrip();
+            #print "RECEIVED: " + line.rstrip();
         print "stopped reading"
     def __handleOutput(self):
         while not self.p.stdin.closed:

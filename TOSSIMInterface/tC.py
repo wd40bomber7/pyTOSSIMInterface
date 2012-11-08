@@ -49,7 +49,6 @@ r = t.radio()
 while True:
     input = sys.stdin.readline().rstrip()
     cmd = input.rsplit(" ")
-    print "got"
     if cmd[0] == "Settopo":
         try:
             f = open(input[len(cmd[0])+1:], "r")
