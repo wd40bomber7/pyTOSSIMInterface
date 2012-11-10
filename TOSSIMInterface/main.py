@@ -11,6 +11,7 @@ if __name__ == '__main__':
 import wx
 import Simulation
 import OutputWindow
+import TopoOutput
 import ConfigWindow
 import InjectionWindow
 import sys
@@ -68,6 +69,10 @@ if topoWindowAllowed:
     programState.WindowBuilders["TopoWindow"] = TopoWindow.TopoWindow
 else:
     programState.WindowBuilders["TopoWindow"] = None
+if topoWindowAllowed:
+    programState.WindowBuilders["TopoOutputWindow"] = TopoOutput.TopoOutput
+else:
+    programState.WindowBuilders["TopoOutputWindow"] = None
 programState.WindowBuilders["InjectionWindow"] = InjectionWindow.InjectionWindow
 
 if options.window is None:

@@ -13,7 +13,9 @@ import pygraphviz as pgv
 import re
 from Simulation import SimConnection
 
-class TopoWindow(PrimaryFrame.MainWindow):
+WindowWidth = 300
+
+class TopoOutput(PrimaryFrame.MainWindow):
     '''
     A MDI child class made for displaying output
     '''
@@ -23,21 +25,22 @@ class TopoWindow(PrimaryFrame.MainWindow):
         Constructor
         '''
         #setup
-        super(TopoWindow,self).__init__(sim,"Topo Edit Window")
+        super(TopoOutput,self).__init__(sim,"Topo Edit Window")
         #Variables
+        self.excludedChannels = list() #A list of channels not being shown
         self.topoData = None
         self.readPosition = 0; #the line in the list of all received lines this node is reading at
         #Create menus
-        self.topoExpirationMenu = wx.Menu()
-        self.nodeMenu = wx.Menu()
+        self.windowSizeMenu = wx.Menu()
+        self.channelsMenu = wx.Menu()
         #Register menus
-        self.RegisterMenu(self.topoExpirationMenu);
+        self.RegisterMenu(self.windowSizeMenu)
+        self.RegisterMenu(self.channelsMenu)
         #self.RegisterMenu(self.nodeMenu);
         #Append menus
-        self.menuBar.Append(self.topoExpirationMenu,"Message Expiration")
+        self.menuBar.Append(self.channelsMenu,"Channels");
+        self.menuBar.Append(self.windowSizeMenu,"Topo Window Size")
         #self.menuBar.Append(self.nodeMenu,"Nodes")
-        
-        self.RebuildMenus()
         
         self.nodePanel = SketchWindow(self, -1)
         sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -51,36 +54,45 @@ class TopoWindow(PrimaryFrame.MainWindow):
         self.nodePanel.Bind(wx.EVT_LEAVE_WINDOW, self.__OnMouseLeave, self.nodePanel)
         self.nodePanel.Bind(wx.EVT_MOTION, self.__OnMouseMove, self.nodePanel)
         
+        self.RebuildMenus()
+        
         #Update timer
         self.timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.UpdateDisplay, self.timer)
-        self.timer.Start(100);
+        self.timer.Start(100)
         
-        self.Show();
+        self.Show()
         
 
         
     def RebuildMenus(self):
         '''
-        Rebuilds the menus of this TopoWindow. 
+        Rebuilds the menus of this TopoOutput. 
         '''
-        menuBar = super(TopoWindow,self).RebuildMenus();
+        menuBar = super(TopoOutput,self).RebuildMenus();
         
-        self.expireDict = dict();
+        self.windowDict = dict()
+        self.channelDict = dict()
+        
+        #channelsMenu
+        self.channelCount = len(self.sim.selectedOptions.channelList)
+        for channel in self.sim.selectedOptions.channelList:
+            item = self.AddMenuItem(self.channelsMenu, channel, self.__OnChannel, not channel in self.excludedChannels)
+            self.channelDict[item.GetId()] = channel
 
-        item = self.AddMenuItem(self.topoExpirationMenu, ".5", self.__OnTopoSelect)
-        self.expireDict[item.GetId()] = .5
-        item = self.AddMenuItem(self.topoExpirationMenu, "1", self.__OnTopoSelect)
-        self.expireDict[item.GetId()] = 1
-        item = self.AddMenuItem(self.topoExpirationMenu, "2", self.__OnTopoSelect)
-        self.expireDict[item.GetId()] = 2
-        item = self.AddMenuItem(self.topoExpirationMenu, "5", self.__OnTopoSelect)
-        self.expireDict[item.GetId()] = 5
-        item = self.AddMenuItem(self.topoExpirationMenu, "60", self.__OnTopoSelect)
-        self.expireDict[item.GetId()] = 60
+        #Window size menu
+        item = self.AddMenuItem(self.windowSizeMenu,"100", self.__OnWindowSizeChange)
+        self.windowDict[item.GetId()] = 100
+        item = self.AddMenuItem(self.windowSizeMenu,"200", self.__OnWindowSizeChange)
+        self.windowDict[item.GetId()] = 200
+        item = self.AddMenuItem(self.windowSizeMenu,"300", self.__OnWindowSizeChange)
+        self.windowDict[item.GetId()] = 300
+        item = self.AddMenuItem(self.windowSizeMenu,"500", self.__OnWindowSizeChange)
+        self.windowDict[item.GetId()] = 500
         
         
-        RelayerTopo() #Do this here so every time your menus are forced to update so is the topo window
+        
+        self.RelayerTopo() #Do this here so every time your menus are forced to update so is the topo window
         return menuBar;
         
     def WindowType(self):
@@ -89,6 +101,9 @@ class TopoWindow(PrimaryFrame.MainWindow):
         '''
         Determines the draw positions of all nodes
         '''
+        if self.sim.simulationState.currentTopo is None:
+            return
+        self.topoData = self.sim.simulationState.currentTopo
         #First build the graphviz object with the list of connections
         graph=pgv.AGraph()
         onlyOneWay = list()
@@ -156,6 +171,10 @@ class TopoWindow(PrimaryFrame.MainWindow):
                 if otherId == nodeId:
                     continue
                 otherNode = nodeLayout[otherId]
+                dist = ((node.x-otherNode.x) ** 2 + (node.y-otherNode.y) ** 2) ** .5
+                if dist > .3:
+                    continue
+                
                 avgX += otherNode.x
                 avgY += otherNode.y
                 cloudCount += 1
@@ -172,18 +191,27 @@ class TopoWindow(PrimaryFrame.MainWindow):
             
             #The larger one decides the primary placement of the box
             if abs(vectX) > abs(vectY):
-                node.myWindow.x = -1 if vectX < 0 else 1
-                node.myWindow.y = vectY-.5
+                node.myWindow.x = -1 if vectX < 0 else 0
+                node.myWindow.y = vectY*.5 - .5
             else:
-                node.myWindow.x = vectX-.5
-                node.myWindow.y = -1 if vectY < 0 else 1
-        
+                node.myWindow.x = vectX*.5 - .5
+                node.myWindow.y = -1 if vectY < 0 else 0
         self.nodePanel.connectedNodes = nodeLayout;
         self.Refresh()
     def UpdateDisplay(self, event):
-        newData = self.sim.simulationState.messages.RetrieveFilteredList(list(),list(),list(),self.readPosition)
+        newData = self.sim.simulationState.messages.RetrieveFilteredList(list(),self.excludedChannels,list(),self.readPosition)
         self.readPosition = newData[0]
-        #for message in newData[1]:
+        for message in newData[1]:
+            node = self.nodePanel.connectedNodes[message.nodeId]
+            if message.topoSlot < 0:
+                if len(node.myWindow.messages) >= 3:
+                    del node.myWindow.messages[0]
+                node.myWindow.messages.append(message.messageText)
+            else:
+                node.myWindow.fixedMessages[message.topoSlot] = message.messageText
+                
+        if len(newData[1]) > 0:
+            self.Refresh()
             
     def LoadTopo(self):
         try:
@@ -194,7 +222,29 @@ class TopoWindow(PrimaryFrame.MainWindow):
             self.displayError("Unable to load selected topo file.");
             return;
         self.RelayerTopo()
-            
+          
+    #Menus
+    #Window size menu
+    def __OnWindowSizeChange(self, event):
+        '''
+        stub
+        '''
+    #For the channel Menu
+    def __OnChannel(self, event):
+        channel = self.channelDict[event.GetId()]
+        if channel in self.excludedChannels:
+            self.excludedChannels.remove(channel)
+        else:
+            self.excludedChannels.append(channel)
+        for nodeId in self.nodePanel.connectedNodes:
+            node = self.nodePanel.connectedNodes[nodeId]
+            node.myWindow.messages = list()
+            for i in xrange(0,len(node.myWindow.fixedMessages)):
+                node.myWindow.fixedMessages[i] = ""
+        self.readPosition = 0
+        self.UpdateDisplay(None)
+        self.Refresh()
+        
     #Editing handlers
     def __OnMouseMove(self, event):
         '''
@@ -215,23 +265,63 @@ class TopoWindow(PrimaryFrame.MainWindow):
         '''
         stub
         '''
+
 class NodeWindow(object):
     def __init__(self,x=0,y=0):
         #The x and y are -1 to 1 and are multiplied by the width/height and added to the node's position to find the top left corner of the window
         self.x = x
         self.y = y
+        #The top 3 regular messages are displayed in the order they are received
+        #Fixed messages are displayed in the order they specify and are above the regular messages
         self.messages = list()
-        self.posMessages = list()
-        self.posExpirations = list()
-        for i in xrange(0,10):
-            self.posMessages.append("")
-            self.posExpirations.append(0)
-    def mapMessagesToLines(self,dc):
-        highestPosMessage = -1
-        for i in xrange(0,10):
-            if self.posExpirations[i] > 0:
-                highestPosMessage = i
+        self.fixedMessages = list()
+        #These contain two element arrays. The text of the line followed by the color
+        self.messageLines = list()
+        self.fixedMessageLines = list()
         
+        for i in xrange(0,10):
+            self.fixedMessages.append("")
+            
+    def mapMessagesToLines(self,dc,maxLength):
+        #Calculate for regular messages
+        self.__mapMessageToLineList(dc,maxLength,self.messages,self.messageLines)
+        #Calculated for fixed position messages
+        highestPosMessage = -1
+        fixedLines = list()
+        for i in xrange(0,10):
+            if len(self.fixedMessages[i]) > 0:
+                highestPosMessage = i
+        for i in xrange(0,highestPosMessage):
+            fixedLines.append(self.fixedMessages[i])
+        self.__mapMessageToLineList(dc,maxLength,fixedLines,self.fixedMessageLines)
+        return (len(self.fixedMessageLines),len(self.messageLines),dc.GetTextExtent("A")[1])
+        
+    def __mapMessageToLineList(self,dc,maxLength,messageList,mapToMessageList):
+        lineIsGrey = True
+        del mapToMessageList[:]
+        for message in messageList:
+            #print "Splitting:\"" + message + "\""
+            lineIsGrey = not lineIsGrey
+            while len(message) > 0:
+                cursor = len(message)
+                messagePart = message
+                while cursor > 0 and dc.GetTextExtent(messagePart)[0] > maxLength:
+                    #Move the cursor one word back
+                    cursor -= 1
+                    while cursor > 0 and message[cursor-1] != ' ':
+                        cursor -= 1
+                    if cursor > 0:
+                        messagePart = message[:cursor]
+                #If breaking in between the word failed,break in the middle of the word
+                if cursor <= 0:
+                    cursor = len(message)
+                    while dc.GetTextExtent(messagePart)[0] > maxLength:
+                        cursor -= 1
+                        messagePart = message[:cursor]
+                message = message[cursor:]
+                mapToMessageList.append((messagePart,lineIsGrey))
+                #print "\t" + messagePart
+                
 class Node(object):
     def __init__ (self, node,x=0,y=0):
         self.x = x
@@ -296,6 +386,7 @@ class SketchWindow(wx.Panel):
         return True
 
     def Drawnodes(self,dc):
+        print "DRAWING nodes"
         width,height=self.GetClientSizeTuple()
 
         #First draw connections
@@ -327,12 +418,51 @@ class SketchWindow(wx.Panel):
             
         #Third draw windows
         #process of drawing windows.
-        #1. Break text into lines based off of allowed length
-        #2. Draw a solid white background for the total actual lines
-        #3. Draw a thick border including a thin title bar
-        #4. Draw a think border between slot messages and regular messages 
-        #5. Color alternating message boxes in a grey color
-        #6. Draw messages in black over the background
+        
+        for nodeId in self.connectedNodes:
+            node = self.connectedNodes[nodeId]
+            #1. Break text into lines based off of allowed length
+            size = node.myWindow.mapMessagesToLines(dc,WindowWidth)
+            totalHeight = ((size[0]+size[1])*size[2]) + size[2] + 4.0 + 4.0
+            #totalHeight = 50
+            #2. Draw a solid white background for the total actual lines
+            x = node.myWindow.x*WindowWidth+node.x*width
+            y = node.myWindow.y*totalHeight+node.y*height
+            
+            x = max(x,0)
+            y = max(y,0)
+            x = min(x,width-WindowWidth)
+            y = min(y,height-totalHeight)
+            
+            brush = wx.Brush('white')
+            pen = wx.Pen('black',2)
+            dc.SetPen(pen)
+            dc.SetBrush(brush)
+            dc.DrawRectangle(x,y,WindowWidth,totalHeight)
+            dc.DrawLine(x,y+size[2]-1,x+WindowWidth-1,y+size[2]-1)
+            pen = wx.Pen('green',4)
+            dc.SetPen(pen)
+            dc.DrawLine(x+2,y+size[2]+size[0]*size[2]+2,x+WindowWidth-3,y+size[2]+size[0]*size[2]+2)
+            #3. Draw a thick border including a thin title ba\
+            #4. Draw a think border between slot messages and regular messages 
+            #5. Color alternating message boxes in a grey color
+            #6. Draw messages in black over the background
+            brush = wx.Brush('grey')
+            pen = wx.Pen('grey',1)
+            dc.SetPen(pen)
+            dc.SetBrush(brush)
+            yAt = y+size[2]
+            for mes in node.myWindow.fixedMessageLines:
+                if mes[1]:
+                    dc.DrawRectangle(x+1,yAt,WindowWidth-3,size[2])
+                dc.DrawText(mes[0],x+1,yAt)
+                yAt += size[2]
+            yAt += 4.0
+            for mes in node.myWindow.messageLines:
+                if mes[1]: #Lines alternate grey and white
+                    dc.DrawRectangle(x+1,yAt,WindowWidth-3,size[2])
+                dc.DrawText(mes[0],x+1,yAt)
+                yAt += size[2]
 
     def OnEraseBack(self, event):
         pass # do nothing to avoid flicker

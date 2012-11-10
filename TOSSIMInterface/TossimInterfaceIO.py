@@ -52,7 +52,7 @@ class InterfaceIO(object):
         while self.__runInputOutput and (not self.p.stdout.closed):
             line = self.p.stdout.readline()
             if len(line) == 0:
-		      break;
+              break;
             self.sim.simulationState.ioQueues.QueueInput(line.rstrip());
             #print "RECEIVED: " + line.rstrip();
         print "stopped reading"
@@ -67,7 +67,7 @@ class InterfaceIO(object):
             except:
                 time.sleep(1.0/10000.0)
             if (not self.__runInputOutput):
-		return; #Put this here instead of at the while so the flush runs at least one more time after a shut down is requested
+                return; #Put this here instead of at the while so the flush runs at least one more time after a shut down is requested
             
     #Automatic sliding sleep time. Uses least amount of cpu time necessary
     def __processInput(self):

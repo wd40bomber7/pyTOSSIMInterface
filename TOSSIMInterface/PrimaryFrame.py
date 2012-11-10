@@ -62,6 +62,7 @@ class MainWindow(wx.Frame):
         
         self.AddMenuItem(self.simulationMenu, "Open Output Window", self.__OnShowOutput)
         self.AddMenuItem(self.simulationMenu, "Open Topo Edit Window", self.__OnShowTopo)
+        self.AddMenuItem(self.simulationMenu, "Open Topo Output Window", self.__OnShowTopoOutput)
         self.AddMenuItem(self.simulationMenu, "Open Command Inject Window", self.__OnShowCommand)
         self.AddMenuItem(self.simulationMenu, "Open Simulation Options Window", self.__OnShowOptions)
         self.simulationMenu.AppendSeparator()
@@ -118,14 +119,14 @@ class MainWindow(wx.Frame):
         while (time.time() - start) < 3: #Wait 3 seconds. No longer
             cmds = self.sim.simulationState.ioQueues.LiquidateCommandQueue();
             if len(cmds) > 0:
-		print "Response: " + cmds[0]
+                print "Response: " + cmds[0]
                 return cmds[0];
             time.sleep(.1)
         print "Command timed out"
         return "";
     
     def StartSimulation(self):
-	self.sim.simulationState.messages.ClearAll()
+        self.sim.simulationState.messages.ClearAll()
         if len(self.sim.selectedOptions.childPythonName) <= 0:
             self.displayError("You must set a python file to run in the config window.")
             return
@@ -168,19 +169,19 @@ class MainWindow(wx.Frame):
             self.sim.simulationState.ioReadWrite = None
             self.sim.simulationState.simIsRunning = False;
             self.displayError("Target was unable to load topo file. Make sure directory is not relative.");
-	    return;
+            return
         self.sim.simulationState.ioQueues.QueueOutput("Setnoise " + self.sim.selectedOptions.noiseFileName)
         if self.__WaitForCommand() != "_noiseloaded success":
             self.sim.simulationState.ioReadWrite.StopThreads()
             self.sim.simulationState.ioReadWrite = None
             self.sim.simulationState.simIsRunning = False;
             self.displayError("Target was unable to load noise file. Make sure directory is not relative.");
-	    return;
+            return
         self.sim.simulationState.ioQueues.QueueOutput("Startsimulation")
         for window in self.sim.openWindows:
             window.RebuildMenus()
             if window.WindowType() == 1:
-		window.RebuildDisplay()
+                window.RebuildDisplay()
     def __OnSimulationStart(self, event):
         self.StartSimulation()
         
@@ -216,7 +217,13 @@ class MainWindow(wx.Frame):
             self.displayError("You must install pygraphviz to use the topo map.")
         else:
             self.sim.WindowBuilders["TopoWindow"](self.sim)
-        
+            
+    def __OnShowTopoOutput(self, event):
+        if self.sim.WindowBuilders["TopoOutputWindow"] is None:
+            self.displayError("You must install pygraphviz to use the topo map.")
+        else:
+            self.sim.WindowBuilders["TopoOutputWindow"](self.sim)
+            
     def __OnShowCommand(self, event):
         self.sim.WindowBuilders["InjectionWindow"](self.sim)
         

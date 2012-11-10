@@ -25,7 +25,7 @@ class Message(object):
         self.channelList = []; #one message can have multiple channels
         self.messageType = MessageType.Debug;
         self.topoMessage = False;
-        self.topoSlot = 0;
+        self.topoSlot = -1;
         
     def ContainsChannelFromList(self,channelList):
         '''
@@ -78,12 +78,11 @@ class MessagePool(object):
             if message.messageText[0] == "_":
                 parts = message.messageText.split("_")
                 try:
-                    message.topoSlot = int(parts[0])
+                    print "XXX: " + parts[1]
+                    message.topoSlot = int(parts[1])
+                    message.messageText = message.messageText[len(parts[1])+2:]
                 except:
                     message.topoSlot = -1
-                message.topoMessage = True
-            else:
-                message.topoMessage = False
                 
         
         self.messagesLock.acquire()
@@ -94,14 +93,12 @@ class MessagePool(object):
         self.messagesLock.release()
         return message
         
-    def RetrieveFilteredList(self,allowedTypes,allowedChannels,allowedNodes,readPosition=0,topoMessages=False):
+    def RetrieveFilteredList(self,allowedTypes,allowedChannels,allowedNodes,readPosition=0):
         filteredList = list()
         self.messagesLock.acquire()
         newReadPosition = len(self.__storedMessages)
         for i in range(readPosition,newReadPosition) :
             message = self.__storedMessages[i]
-            if message.topoMessage != topoMessages:
-                continue;
             if message.messageType in allowedTypes:
                 continue
             if message.nodeId in allowedNodes:

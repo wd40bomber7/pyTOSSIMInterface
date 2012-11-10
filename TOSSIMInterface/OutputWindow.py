@@ -23,9 +23,9 @@ class OutputWindow(PrimaryFrame.MainWindow):
         '''
         #Variables
         self.readPosition = 0; #the line in the list of all received lines this node is reading at
-        self.selectedChannels = list();
-        self.selectedTypes = list();
-        self.selectedNodes = list();
+        self.excludedChannels = list();
+        self.excludedTypes = list();
+        self.excludedNodes = list();
         
         self.displayNodeId = True;
         self.displayChannel = False;
@@ -91,22 +91,23 @@ class OutputWindow(PrimaryFrame.MainWindow):
         self.presetDict = dict();
         
         #type menu
-        self.testerValue = self.AddMenuItem(self.typeMenu, "Debug", self.__OnTypeDebug,not MessageType.Debug in self.selectedTypes)
-        self.AddMenuItem(self.typeMenu, "Error", self.__OnTypeError,not MessageType.Error in self.selectedTypes)
+        self.testerValue = self.AddMenuItem(self.typeMenu, "Debug", self.__OnTypeDebug,not MessageType.Debug in self.excludedTypes)
+        self.AddMenuItem(self.typeMenu, "Error", self.__OnTypeError,not MessageType.Error in self.excludedTypes)
         
         #channelsMenu
         self.channelCount = len(self.sim.selectedOptions.channelList)
         for channel in self.sim.selectedOptions.channelList:
-            item = self.AddMenuItem(self.channelsMenu, channel, self.__OnChannel, not channel in self.selectedChannels)
+            item = self.AddMenuItem(self.channelsMenu, channel, self.__OnChannel, not channel in self.excludedChannels)
             self.channelDict[item.GetId()] = channel
         
         #nodesMenu
-        for node in self.sim.simulationState.currentTopo.nodeDict:
-            item = self.AddMenuItem(self.nodesMenu, "Node " + str(node), self.__OnNode, not node in self.selectedNodes)
-            self.nodeDict[item.GetId()] = node
+        if not self.sim.simulationState.currentTopo is None:
+            for node in self.sim.simulationState.currentTopo.nodeDict:
+                item = self.AddMenuItem(self.nodesMenu, "Node " + str(node), self.__OnNode, not node in self.excludedNodes)
+                self.nodeDict[item.GetId()] = node
 
         #self.nodesMenu.AppendSeparator();
-        #item = self.AddMenuItem(self.nodesMenu, "All Nodes", self.__OnNode, node in self.selectedChannels)
+        #item = self.AddMenuItem(self.nodesMenu, "All Nodes", self.__OnNode, node in self.excludedChannels)
         #self.nodeDict[item.GetId()] = node
         
         #displayMenu
@@ -159,7 +160,7 @@ class OutputWindow(PrimaryFrame.MainWindow):
     
     def UpdateDisplay(self, event):
         simple = [0,0,0]
-        newData = self.sim.simulationState.messages.RetrieveFilteredList(self.selectedTypes,self.selectedChannels,self.selectedNodes,self.readPosition)
+        newData = self.sim.simulationState.messages.RetrieveFilteredList(self.excludedTypes,self.excludedChannels,self.excludedNodes,self.readPosition)
         #print "Updated display. [" + str(self.readPosition) + " -> " + str(newData[0]) + "]"
         self.readPosition = newData[0]
         for message in newData[1]:
@@ -191,38 +192,38 @@ class OutputWindow(PrimaryFrame.MainWindow):
         super(OutputWindow,self).OnClose(event)
         #For the type Menu
     def __OnTypeDebug(self, event):
-        if MessageType.Debug in self.selectedTypes:
-            self.selectedTypes.remove(MessageType.Debug)
+        if MessageType.Debug in self.excludedTypes:
+            self.excludedTypes.remove(MessageType.Debug)
         else:
-            self.selectedTypes.append(MessageType.Debug)
+            self.excludedTypes.append(MessageType.Debug)
         self.selectedPreset = None;
         self.RebuildDisplay()
             
     def __OnTypeError(self, event):
-        if MessageType.Error in self.selectedTypes:
-            self.selectedTypes.remove(MessageType.Error)
+        if MessageType.Error in self.excludedTypes:
+            self.excludedTypes.remove(MessageType.Error)
         else:
-            self.selectedTypes.append(MessageType.Error)
+            self.excludedTypes.append(MessageType.Error)
         self.selectedPreset = None;
         self.RebuildDisplay()
-            
+        
     #For the channel Menu
     def __OnChannel(self, event):
         channel = self.channelDict[event.GetId()]
-        if channel in self.selectedChannels:
-            self.selectedChannels.remove(channel)
+        if channel in self.excludedChannels:
+            self.excludedChannels.remove(channel)
         else:
-            self.selectedChannels.append(channel)
+            self.excludedChannels.append(channel)
         self.selectedPreset = None;
         self.RebuildDisplay()
         
     #For the nodes Menu
     def __OnNode(self, event):
         node = self.nodeDict[event.GetId()]
-        if node in self.selectedNodes:
-            self.selectedNodes.remove(node)
+        if node in self.excludedNodes:
+            self.excludedNodes.remove(node)
         else:
-            self.selectedNodes.append(node)
+            self.excludedNodes.append(node)
         self.selectedPreset = None;
         self.RebuildDisplay()
     #For the display Menu
@@ -284,25 +285,25 @@ class OutputWindow(PrimaryFrame.MainWindow):
         
     def __buildPreset(self, name):
         newPreset = Simulation.SimOutput()
-        newPreset.selectedChannels = self.selectedChannels[:]
-        newPreset.selectedNodes = self.selectedNodes[:]
-        newPreset.selectedTypes = self.selectedTypes[:]
+        newPreset.excludedChannels = self.excludedChannels[:]
+        newPreset.excludedNodes = self.excludedNodes[:]
+        newPreset.excludedTypes = self.excludedTypes[:]
         newPreset.displayChannel = self.displayChannel;
         newPreset.displayNodeId = self.displayNodeId;
         newPreset.displayType = self.displayType;
         newPreset.name = name;
         self.sim.savedPresets.outputPresets.append(newPreset);
     def __loadPreset(self, preset):
-        self.selectedChannels = preset.selectedChannels[:]
-        self.selectedTypes = preset.selectedTypes[:]
-        self.selectedNodes = preset.selectedNodes[:]
+        self.excludedChannels = preset.excludedChannels[:]
+        self.excludedTypes = preset.excludedTypes[:]
+        self.excludedNodes = preset.excludedNodes[:]
         self.displayChannel = preset.displayChannel
         self.displayNodeId = preset.displayNodeId;
         self.displayType = preset.displayType;
     def __overWritePreset(self, toReplace):
-        toReplace.selectedChannels = self.selectedChannels[:]
-        toReplace.selectedNodes = self.selectedNodes[:]
-        toReplace.selectedTypes = self.selectedTypes[:]
+        toReplace.excludedChannels = self.excludedChannels[:]
+        toReplace.excludedNodes = self.excludedNodes[:]
+        toReplace.excludedTypes = self.excludedTypes[:]
         toReplace.displayChannel = self.displayChannel;
         toReplace.displayNodeId = self.displayNodeId;
         toReplace.displayType = self.displayType;
