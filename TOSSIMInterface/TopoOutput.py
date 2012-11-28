@@ -177,8 +177,9 @@ class TopoOutput(PrimaryFrame.MainWindow):
                 avgX += otherNode.x
                 avgY += otherNode.y
                 cloudCount += 1
-            avgX /= cloudCount
-            avgY /= cloudCount
+            if cloudCount > 0:
+                avgX /= cloudCount
+                avgY /= cloudCount
             #Now create a vector pointing away from that average position
             #this should point away from the majority of nearby nodes
             vectX = node.x-avgX + .0001 #we add .0001 to guarantee there is never length=0
@@ -387,7 +388,6 @@ class SketchWindow(wx.Panel):
         return True
 
     def Drawnodes(self,dc):
-        print "DRAWING nodes"
         width,height=self.GetClientSizeTuple()
 
         #First draw connections

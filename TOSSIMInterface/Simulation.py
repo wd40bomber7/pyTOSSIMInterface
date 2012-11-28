@@ -8,8 +8,7 @@ import pickle
 import threading
 import collections
 import Messages
-import os
-import sys
+import re
 
 class SimOptions(object):
     '''
@@ -24,6 +23,7 @@ class SimOptions(object):
             self.channelList = list()
             self.opsPerSecond = 10000000
             self.name = ""
+            self.currentStartupScript = None
         else:
             self.autolearnChannels = toCopy.autolearnChannels
             self.childPythonName = toCopy.childPythonName
@@ -32,6 +32,7 @@ class SimOptions(object):
             self.channelList = list(toCopy.channelList)
             self.opsPerSecond = toCopy.opsPerSecond
             self.name = toCopy.name
+            self.currentStartupScript = toCopy.currentStartupScript
 
       
 class SimOutput(object):
@@ -201,8 +202,112 @@ class SimTopo(object):
             connection.fromNode = reId[connection.fromNode]
             connection.toNode = reId[connection.toNode]
             #print "[" + str(connection.fromNode) + "->" + str(connection.toNode) + "]"
+class SimInject(object):
+    '''
+    An inject ready to be sent as a packet
+    '''
+    def __init__(self,toInject,src,dst,selected=None):
+        self.isValid = False
+        self.sendAtTime = 0
+        self.src = src
+        self.dst = dst
+        self.injection = toInject
+        self.injection = self.injection.replace("%src%",str(src))
+        self.injection = self.injection.replace("%dst%",str(dst))
+        if not selected is None:
+            self.injection = self.injection.replace("%sel%",str(selected))
+        if not "%" in self.injection:
+            self.isValid = True
         
+    
+class SimScript(object):
+    '''
+    Holds a script made to be written as injection commands at the start of the simulation
+    '''
+    
+    def __init__(self,name):
+        self.name = name
+        self.script = ""
+        self.injectList = list()
+        #0005:15:4 5-7 Hello world!
+        #0020:99:1-4 11 cmd ping %src%
+        #0030:99:1 1-4 cmd kill  
+    def BuildInjectList(self):
+        #Try to build the list. May throw exceptions
+        self.injectList = list()
+        scriptIterator = iter(self.script.splitlines())
+        for line in scriptIterator:
+            self.__buildLine(line)
         
+    def __buildLine(self,line):
+        #First double check you have the minimum space count
+        splitBySpaces = re.findall("\w+",line)
+        if len(splitBySpaces) < 2:
+            raise Exception("Incorrect number of segments. (Missing spaces)")
+        #Now check for minimum colons
+        splitByColon = splitBySpaces[0].split(':')
+        if len(splitByColon) < 3:
+            raise Exception("Incorrect number of segments. (Missing colons)")
+        
+        issueAtTime = int(splitByColon[0])
+        if issueAtTime < 0:
+            return False
+        issueAtPort = int(splitByColon[1])
+        if issueAtPort < 0:
+            return False
+        
+        #This line is a little tricky. We're looking for the first number or range of numbers which is the source
+        #it usually is directly to the right of the second colon, but there may be an additional space
+        #By using leftstrip we get rid of any possible spaces between that colon and the src
+        #then we split by spaces so we only get the source, and finally we split by - so we can easily check
+        #if we have a range or not
+        filteredSrc = splitByColon[2].lstrip().split(" ")[0].split("-")
+        if len(filteredSrc) == 1:
+            srcCount = 1
+            srcId = int(filteredSrc[0])
+        else:
+            a = int(filteredSrc[0])
+            b = int(filteredSrc[1])
+            #Calculate the base, and how many nodes there are in the range
+            srcCount = max(a,b)-min(a,b)+1
+            srcId = min(a,b)
+        
+        #Now do the same for the dst
+        filteredDst = splitByColon[2].lstrip().split(" ")[1].split("-")
+        if len(filteredSrc) == 1:
+            dstCount = 1
+            dstId = int(filteredDst[0])
+        else:
+            a = int(filteredDst[0])
+            b = int(filteredDst[1])
+            #Calculate the base, and how many nodes there are in the range
+            dstCount = max(a,b)-min(a,b)+1
+            dstId = min(a,b)
+            
+        #Finally uncover the actual injectable command/text
+        injectable = splitByColon[2].lstrip().split(" ")[2]
+        
+        #Current implementation requires one source per destination in multi src, multi dst, situations
+        if (srcCount > 1) and (dstCount > 1) and (dstCount != srcCount):
+            raise Exception("Mismatched source to destination count")
+        elif (srcCount > 1) and (dstCount > 1):
+            #Map 1 -> 1 nodes
+            for x in xrange(0,srcCount):
+                inject = SimInject(injectable,srcId+x,dstId+x)
+                self.injectList.append(inject)
+        elif srcCount > 1:
+            for x in xrange(0,srcCount):
+                inject = SimInject(injectable,srcId+x,dstId)
+                self.injectList.append(inject)
+        elif dstCount > 1:
+            for x in xrange(0,dstCount):
+                inject = SimInject(injectable,srcId,dstId+x)
+                self.injectList.append(inject)
+        else:
+            #Directly one to one
+            inject = SimInject(injectable,srcId,dstId)
+            self.injectList.append(inject)
+       
 class SimPresets(object):
     '''
     Used to easily pickle all current presets
@@ -211,7 +316,11 @@ class SimPresets(object):
     def __init__(self):
         self.outputPresets = list() #list of all saved output window presets
         self.configPresets = list() #List of all SimOptions stored presets
-        self.topoHistory = list()
+        self.topoHistory = list() #List of most recently opened/edited topo files
+        self.startScripts = list() #List of all defined startup scripts
+        
+        #This is used to store the options when they are being overriden by -o
+        #It should not be modified directly. Instead modify selectedOptions from the sim object
         self.lastSimulationOptions = SimOptions()
         
     def addTopo(self,topoFile):
