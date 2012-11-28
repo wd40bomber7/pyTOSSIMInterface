@@ -8,8 +8,9 @@ Created on Oct 17, 2012
 import wx;
 import PrimaryFrame;
 import Simulation
+import time
 from Messages import MessageType
-
+from threading import Thread;
 
 class InjectionWindow(PrimaryFrame.MainWindow):
     '''
@@ -193,9 +194,33 @@ class CommandPanel(wx.Panel):
         wx.StaticText(self,-1,"Command panel should go here",(20,20))
     
     
-    
-class Inject(object):
-    def __init__(self,text,protocol,injectText):
-        self.text = text
-        self.protocol = protocol
-        self.injectText = injectText
+class InjectionStartupHandler(object):
+    def __init__(self, sim):
+        self.sim = sim
+        self.__shouldRun = True
+        self.__startupScriptThread = Thread(None,self.__handleStartupInjections,None,())
+        self.__startupScriptThread.daemon = True
+        self.__startupScriptThread.start()
+    def StopThreads(self):
+        self.__shouldRun = False
+        self.__startupScriptThread.join()
+        
+    def __handleStartupInjections(self):
+        while self.__shouldRun:
+            time.sleep(1.0/10.0);
+            #self.scriptPosition
+            state = self.sim.simulationState
+            if state.simIsRunning and not state.simIsPaused:
+                if self.sim.simulationState.currentStartupScript is None:
+                    continue
+                lastHandledTime = state.scriptPosition
+                elapsedTime = time.time() - state.timeAtLastResume + state.timeBeforeLastResume
+                #print str(time.time()) + ":Total injects " + str(len(self.sim.simulationState.currentStartupScript.injectList)) + " time: " + str(elapsedTime)
+                
+                for inject in self.sim.simulationState.currentStartupScript.injectList:
+                    if (elapsedTime >= inject.sendAtTime) and (lastHandledTime < inject.sendAtTime):
+                        command = "Injectpacket " + str(inject.protocol) + " " + str(inject.src) + " " + str(inject.dst) + " " + str(inject.injection)
+                        print "Full inject: [" + command + "]"
+                        self.sim.simulationState.ioQueues.QueueOutput(command)
+                state.scriptPosition = elapsedTime
+            

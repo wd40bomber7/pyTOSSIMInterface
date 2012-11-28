@@ -1,57 +1,42 @@
 '''
-Created on Oct 13, 2012
+Created on Oct 12, 2012
 
 @author: wd40bomber7
 '''
 
-if __name__ == '__main__':
-    pass
+import pickle
+import threading
+import collections
+import Messages
+import os
+import sys
 
-from threading import Thread;
-import socket;
-import sys;
-import subprocess;
-from Simulation import SimQueues
-
-print "starting" #["python","randomtest.py"]
-p = subprocess.Popen(["python","randomtest.py"],stdout=subprocess.PIPE,stdin=subprocess.PIPE)
-print "working"
-
-p.stdin.write("Good thank you =)\r\n")
-#p.stdin.flush();
-
-while not p.stdout.closed:
-    #print "iterating"
-    read = p.stdout.readline()
-    if (len(read)) == 0:
-        break;
-    print read.rstrip();
-
-print "DONE"
-sys.exit(0);
-
-if len(sys.argv) != 3:
-    print 'usage : stdiodaemno <port> <program to bind to>'
-    sys.exit(1)
-
-port = int(sys.argv[1])
-program = sys.argv[2]
-
-
-
-def ManageNetworkInput():
+class SimOptions(object):
     '''
-    does stuff
+    This class stores the options that control the basic paramaters of the simulation
     '''
-def ManageStdioInput():
+    def __init__(self, toCopy = None):
+        if toCopy is None:
+            self.autolearnChannels = True
+            self.childPythonName = ""
+            self.topoFileName = ""
+            self.noiseFileName = ""
+            self.channelList = list()
+            self.opsPerSecond = 10000000
+            self.name = ""
+        else:
+            self.autolearnChannels = toCopy.autolearnChannels
+            self.childPythonName = toCopy.childPythonName
+            self.topoFileName = toCopy.topoFileName
+            self.noiseFileName = toCopy.noiseFileName
+            self.channelList = list(toCopy.channelList)
+            self.opsPerSecond = toCopy.opsPerSecond
+            self.name = toCopy.name
+
+      
+class SimOutput(object):
     '''
-    more stuff
-    '''
-
-
-s = socket.socket()         # Create a socket object
-host = socket.gethostname() # Get local machine name
-s.bind((host, port))        # Bind to the port
-
-s.listen(5)                 # Now wait for client connection.
-c, addr = s.accept()     # Only one client per daemon
+    This class stores a list of channels, nodes, and message types shown by an output window
+    ''' 
+    
+    def __ini
