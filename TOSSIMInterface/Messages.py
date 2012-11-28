@@ -78,7 +78,6 @@ class MessagePool(object):
             if message.messageText[0] == "_":
                 parts = message.messageText.split("_")
                 try:
-                    print "XXX: " + parts[1]
                     message.topoSlot = int(parts[1])
                     message.messageText = message.messageText[len(parts[1])+2:]
                 except:
