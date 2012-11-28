@@ -38,7 +38,7 @@ parser.add_option("-c","--channels",dest="channels", default=None,
 parser.add_option("-s","--start",action="store_true",dest="start", default=False,
                   help="Start the simulation immediately")
 parser.add_option("-w","--window",dest="window", default=None,action='append',
-                  help="Choose window to start immediately. Options: config,output,topo,inject");
+                  help="Choose window to start immediately. Options: config,output,topo,topooutput,inject");
 
 (options, args) = parser.parse_args(sys.argv)
 
@@ -87,6 +87,8 @@ else:
             frame = TopoWindow.TopoWindow(programState);
         elif window == "inject":
             frame = InjectionWindow.InjectionWindow(programState);
+        elif window == "topooutput":
+            frame = TopoOutput.TopoOutput(programState);
         else:
             print "Invalid options for -w, type -h or --help to print help."
             exit()
