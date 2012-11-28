@@ -16,6 +16,7 @@ class SimOptions(object):
     '''
     def __init__(self, toCopy = None):
         if toCopy is None:
+            self.topoWindowMap = (0,dict()) #This stores the topo hashcode as the first paramater and the dict of NodeId, X, Y of the window positions
             self.autolearnChannels = True
             self.childPythonName = ""
             self.topoFileName = ""
@@ -25,6 +26,7 @@ class SimOptions(object):
             self.name = ""
             self.currentStartupScript = None
         else:
+            self.topoWindowMap = toCopy.topoWindowMap
             self.autolearnChannels = toCopy.autolearnChannels
             self.childPythonName = toCopy.childPythonName
             self.topoFileName = toCopy.topoFileName
@@ -83,7 +85,7 @@ class SimTopo(object):
     ''' 
 
     def __init__(self,topoFile=None):
-        
+        self.hashCode = 0
         self.nodeDict = dict(); #maps a node ids to node objects
         self.topoFileName = ""
         self.connectionList = list()
@@ -97,6 +99,7 @@ class SimTopo(object):
         fileData = topoFile.readlines()
         topoFile.close()
         
+        connectionCount = 0
         for line in fileData:
             parts = line.rstrip().rsplit(" ")
             if len(parts) <= 1:
@@ -104,6 +107,11 @@ class SimTopo(object):
             fromNode = int(parts[0]);
             toNode = int(parts[1]);
             self.AddConnection(fromNode, toNode)
+            connectionCount += 1
+            self.hashCode += fromNode + 16*toNode
+            self.hashCode += 256*256*toNode
+        self.hashCode += 256*connectionCount
+        
     def WriteTopoFile(self):
         fileData = list()
         for connection in self.connectionList:
@@ -206,11 +214,12 @@ class SimInject(object):
     '''
     An inject ready to be sent as a packet
     '''
-    def __init__(self,toInject,src,dst,selected=None):
+    def __init__(self,toInject,src,dst,protocol,selected=None):
         self.isValid = False
         self.sendAtTime = 0
         self.src = src
         self.dst = dst
+        self.protocol = protocol
         self.injection = toInject
         self.injection = self.injection.replace("%src%",str(src))
         self.injection = self.injection.replace("%dst%",str(dst))
@@ -245,15 +254,15 @@ class SimScript(object):
         if len(splitBySpaces) < 2:
             raise Exception("Incorrect number of segments. (Missing spaces)")
         #Now check for minimum colons
-        splitByColon = splitBySpaces[0].split(':')
+        splitByColon = line.split(':')
         if len(splitByColon) < 3:
-            raise Exception("Incorrect number of segments. (Missing colons)")
+            raise Exception("Incorrect number of segments[" + str(len(splitByColon)) + "]. (Missing colons)")
         
         issueAtTime = int(splitByColon[0])
         if issueAtTime < 0:
             return False
-        issueAtPort = int(splitByColon[1])
-        if issueAtPort < 0:
+        issueOnProtocol = int(splitByColon[1])
+        if issueOnProtocol < 0:
             return False
         
         #This line is a little tricky. We're looking for the first number or range of numbers which is the source
@@ -285,7 +294,7 @@ class SimScript(object):
             dstId = min(a,b)
             
         #Finally uncover the actual injectable command/text
-        injectable = splitByColon[2].lstrip().split(" ")[2]
+        injectable = " ".join(splitByColon[2].lstrip().split(" ")[2:])
         
         #Current implementation requires one source per destination in multi src, multi dst, situations
         if (srcCount > 1) and (dstCount > 1) and (dstCount != srcCount):
@@ -293,19 +302,23 @@ class SimScript(object):
         elif (srcCount > 1) and (dstCount > 1):
             #Map 1 -> 1 nodes
             for x in xrange(0,srcCount):
-                inject = SimInject(injectable,srcId+x,dstId+x)
+                inject = SimInject(injectable,srcId+x,dstId+x,issueOnProtocol)
+                inject.sendAtTime = issueAtTime
                 self.injectList.append(inject)
         elif srcCount > 1:
             for x in xrange(0,srcCount):
-                inject = SimInject(injectable,srcId+x,dstId)
+                inject = SimInject(injectable,srcId+x,dstId,issueOnProtocol)
+                inject.sendAtTime = issueAtTime
                 self.injectList.append(inject)
         elif dstCount > 1:
             for x in xrange(0,dstCount):
-                inject = SimInject(injectable,srcId,dstId+x)
+                inject = SimInject(injectable,srcId,dstId+x,issueOnProtocol)
+                inject.sendAtTime = issueAtTime
                 self.injectList.append(inject)
         else:
             #Directly one to one
-            inject = SimInject(injectable,srcId,dstId)
+            inject = SimInject(injectable,srcId,dstId,issueOnProtocol)
+            inject.sendAtTime = issueAtTime
             self.injectList.append(inject)
        
 class SimPresets(object):
@@ -423,6 +436,10 @@ class SimState(object):
         self.simIsRunning = False
         self.simIsPaused = False
         self.currentTopo = SimTopo()
+        self.timeAtLastResume = 0.0 #The time in seconds since the epoch, when the last time "start" or "resume" was pressed
+        self.timeBeforeLastResume = 0.0 #The total time the simulation ran before the pause button was pressed last time
+        self.scriptPosition = -1.0 #The elapsed time for which all injects have been handled already
+        self.currentStartupScript = None
 
     def AttemptTopoLoad(self, topoFile):
         try:

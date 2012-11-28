@@ -29,6 +29,7 @@ class TopoOutput(PrimaryFrame.MainWindow):
         self.excludedChannels = list() #A list of channels not being shown
         self.topoData = None
         self.readPosition = 0; #the line in the list of all received lines this node is reading at
+        self.selectedNode = None
         #Create menus
         self.windowSizeMenu = wx.Menu()
         self.channelsMenu = wx.Menu()
@@ -180,6 +181,9 @@ class TopoOutput(PrimaryFrame.MainWindow):
             if cloudCount > 0:
                 avgX /= cloudCount
                 avgY /= cloudCount
+            else:
+                avgX = node.x+.001
+                avgY = node.y
             #Now create a vector pointing away from that average position
             #this should point away from the majority of nearby nodes
             vectX = node.x-avgX + .0001 #we add .0001 to guarantee there is never length=0
@@ -248,24 +252,56 @@ class TopoOutput(PrimaryFrame.MainWindow):
         
     #Editing handlers
     def __OnMouseMove(self, event):
-        '''
-        stub
-        '''
+        #If the correct window map hasn't been generated, forget it
+        if self.selectedNode is None:
+            return
+        
+        width,height=self.GetClientSizeTuple()
+        mx = event.GetX()
+        my = event.GetY()
+        xDelta = (mx - self.selectionLastX)/float(width)
+        yDelta = (my - self.selectionLastY)/float(height)
+        
+        #This is very inefficient as the whole tuple has to be remade
+        original = self.sim.selectedOptions.topoWindowMap[1][self.selectedNode]
+        self.sim.selectedOptions.topoWindowMap[1][self.selectedNode] = (
+                        min(max(original[0] + xDelta,0),1),
+                        min(max(original[1] + yDelta,0),1),
+                        original[2],original[3],original[4])
+        
+        self.selectionLastX = mx
+        self.selectionLastY = my
+        self.Refresh()
+        print "Attempted move! (" + str(xDelta) + " " + str(yDelta) + ")"
         
     def __OnMouseLeave(self, event):
-        '''
-        stub
-        '''
+        self.selectedNode = None
         
     def __OnMouseLeftDown(self, event):
-        '''
-        stub
-        '''
+        #Cant do anything if the topoWindowMap hasn't been generated
+        if self.topoData.hashCode != self.sim.selectedOptions.topoWindowMap[0]:
+            return
+        width,height=self.GetClientSizeTuple()
+        #See if the user is selecting a window
+        mx = float(event.GetX())
+        my = float(event.GetY())
+        for nodeId in self.nodePanel.connectedNodes:
+            #Get the topoWindowMap, and lookup the rectangle for that node id
+            windowSelected = self.sim.selectedOptions.topoWindowMap[1][nodeId]
+            windowX = windowSelected[5]
+            windowY = windowSelected[6]
+            windowWidth = windowSelected[2]
+            windowHeight = windowSelected[3]
+            #Check bounds
+            if (windowX <= mx) and (windowY <= my) and (windowX + windowWidth >= mx) and (windowY + windowHeight >= my):
+                self.selectedNode = nodeId
+                self.selectionLastX = mx
+                self.selectionLastY = my 
+                print "They clicked on something!" 
+            
         
     def __OnMouseLeftUp(self, event):
-        '''
-        stub
-        '''
+        self.selectedNode = None
 
 class NodeWindow(object):
     def __init__(self,x=0,y=0):
@@ -367,6 +403,8 @@ class SketchWindow(wx.Panel):
         self.nodeFrom = None
         self.windowWidth = 300
         self.Buffer = None
+        self.sim = parent.sim
+        self.topoData = parent.topoData
 
         self.Bind(wx.EVT_PAINT, self.OnPaint)
         self.Bind(wx.EVT_ERASE_BACKGROUND, self.OnEraseBack)
@@ -386,8 +424,24 @@ class SketchWindow(wx.Panel):
         #self.Drawnodes(dc)
         dc.SelectObject(wx.NullBitmap)
         return True
-
+    
+    def __findClosestCorner(self,rectangle,point):
+        #rectangle is top left x,y, width, height
+        corners = [(rectangle[0],rectangle[1]),
+                   (rectangle[0]+rectangle[2],rectangle[1]),
+                   (rectangle[0],rectangle[1]+rectangle[3]),
+                   (rectangle[0]+rectangle[2],rectangle[1]+rectangle[3])]
+        closestCorner = corners[0]
+        closestDistance = 1000000
+        for corner in corners:
+            distance = ((corner[0]-point[0]) ** 2.0 + (corner[1]-point[1]) ** 2.0) ** 0.5
+            if distance < closestDistance:
+                closestCorner = corner
+                closestDistance = distance
+        return closestCorner
+    
     def Drawnodes(self,dc):
+        self.topoData = self.sim.simulationState.currentTopo
         width,height=self.GetClientSizeTuple()
 
         #First draw connections
@@ -419,23 +473,61 @@ class SketchWindow(wx.Panel):
             
         #Third draw windows
         #process of drawing windows.
+        #Check if the current map works for the current topo
+        if self.topoData.hashCode != self.sim.selectedOptions.topoWindowMap[0]:
+            print "Disposed of existing topo window map"
+            self.sim.selectedOptions.topoWindowMap = (self.topoData.hashCode,dict())
         
+        windowPositions = self.sim.selectedOptions.topoWindowMap[1]
+        #Calculate size,width,and other variables
+        WindowWidth = self.windowWidth
         for nodeId in self.connectedNodes:
             node = self.connectedNodes[nodeId]
-            WindowWidth = self.windowWidth
             #1. Break text into lines based off of allowed length
             size = node.myWindow.mapMessagesToLines(dc,WindowWidth)
             totalHeight = ((size[0]+size[1])*size[2]) + size[2] + 4.0 + 4.0
             #totalHeight = 50
-            #2. Draw a solid white background for the total actual lines
-            x = node.myWindow.x*WindowWidth+node.x*width
-            y = node.myWindow.y*totalHeight+node.y*height
-            
+            #2. Calculate boundries if necessary
+            if not nodeId in windowPositions:
+                print "Rewrote window positions"
+                x = node.myWindow.x*WindowWidth+node.x*width
+                y = node.myWindow.y*totalHeight+node.y*height
+                
+                x = max(x,0)
+                y = max(y,0)
+                x = min(x,width-WindowWidth)
+                y = min(y,height-totalHeight)
+            else:
+                #print "Node: " + str(nodeId) + " at (" + str(windowPositions[nodeId][0]) + "," + str(windowPositions[nodeId][1]) + ")"
+                x = windowPositions[nodeId][0]*width
+                y = windowPositions[nodeId][1]*height
+             
+            #Store the % values so resize events are handled gracefully
+            ufx = float(x)/width
+            ufy = float(y)/height   
+            #Now calculate the correct position at the current size
             x = max(x,0)
             y = max(y,0)
             x = min(x,width-WindowWidth)
             y = min(y,height-totalHeight)
             
+            windowPositions[nodeId] = (ufx,ufy,WindowWidth,totalHeight,size,x,y)
+            #Draw a line from the closest corner to the node in question.
+            nx = node.x*width
+            ny = node.y*height
+            corner = self.__findClosestCorner((x,y,WindowWidth,totalHeight),(nx,ny))
+            pen = wx.Pen('blue',1)
+            dc.SetPen(pen)
+            dc.DrawLine(corner[0],corner[1],nx,ny)           
+            
+            
+        for nodeId in self.connectedNodes:
+            #load x,y from options
+            x = windowPositions[nodeId][5] #These are stored as % to work properly even on window resize
+            y = windowPositions[nodeId][6]
+            
+            size = windowPositions[nodeId][4]
+            totalHeight = windowPositions[nodeId][3]
             #3. Draw a thick border including a thin title bar
             brush = wx.Brush('white')
             pen = wx.Pen('black',2)
