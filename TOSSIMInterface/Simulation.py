@@ -40,9 +40,9 @@ class SimOutput(object):
     ''' 
     
     def __init__(self):
-        self.selectedChannels = list();
-        self.selectedTypes = list();
-        self.selectedNodes = list();
+        self.excludedChannels = list();
+        self.excludedTypes = list();
+        self.excludedNodes = list();
         
         self.displayNodeId = True;
         self.displayChannel = False;
