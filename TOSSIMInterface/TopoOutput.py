@@ -13,7 +13,6 @@ import pygraphviz as pgv
 import re
 from Simulation import SimConnection
 
-WindowWidth = 300
 
 class TopoOutput(PrimaryFrame.MainWindow):
     '''
@@ -226,9 +225,10 @@ class TopoOutput(PrimaryFrame.MainWindow):
     #Menus
     #Window size menu
     def __OnWindowSizeChange(self, event):
-        '''
-        stub
-        '''
+        size = self.windowDict[event.GetId()]
+        self.nodePanel.windowWidth = size
+        self.Refresh()
+        
     #For the channel Menu
     def __OnChannel(self, event):
         channel = self.channelDict[event.GetId()]
@@ -291,7 +291,8 @@ class NodeWindow(object):
         for i in xrange(0,10):
             if len(self.fixedMessages[i]) > 0:
                 highestPosMessage = i
-        for i in xrange(0,highestPosMessage):
+        #print "Highest pos: " + str(highestPosMessage)
+        for i in xrange(0,highestPosMessage+1):
             fixedLines.append(self.fixedMessages[i])
         self.__mapMessageToLineList(dc,maxLength,fixedLines,self.fixedMessageLines)
         return (len(self.fixedMessageLines),len(self.messageLines),dc.GetTextExtent("A")[1])
@@ -363,7 +364,7 @@ class SketchWindow(wx.Panel):
         self.nodeConnections = list()
         self.lineX = self.lineY = -1.0
         self.nodeFrom = None
-        
+        self.windowWidth = 300
         self.Buffer = None
 
         self.Bind(wx.EVT_PAINT, self.OnPaint)
@@ -411,7 +412,7 @@ class SketchWindow(wx.Panel):
             x = node.x*width
             y = node.y*height
             
-            dc.DrawLabel(str(node.id),wx.Rect(x=x-25,y=y-20,width=45,height=20))
+            #dc.DrawLabel(str(node.id),wx.Rect(x=x-25,y=y-20,width=45,height=20))
             dc.DrawCircle(x,y,3) 
             #Store the position for later use  
             self.nodePositions.append(Node(nodeId,x,y))
@@ -421,6 +422,7 @@ class SketchWindow(wx.Panel):
         
         for nodeId in self.connectedNodes:
             node = self.connectedNodes[nodeId]
+            WindowWidth = self.windowWidth
             #1. Break text into lines based off of allowed length
             size = node.myWindow.mapMessagesToLines(dc,WindowWidth)
             totalHeight = ((size[0]+size[1])*size[2]) + size[2] + 4.0 + 4.0
@@ -434,17 +436,19 @@ class SketchWindow(wx.Panel):
             x = min(x,width-WindowWidth)
             y = min(y,height-totalHeight)
             
+            #3. Draw a thick border including a thin title bar
             brush = wx.Brush('white')
             pen = wx.Pen('black',2)
             dc.SetPen(pen)
             dc.SetBrush(brush)
             dc.DrawRectangle(x,y,WindowWidth,totalHeight)
             dc.DrawLine(x,y+size[2]-1,x+WindowWidth-1,y+size[2]-1)
+            dc.DrawLabel("Node " + str(node.id),wx.Rect(x+2,y,45,20))
+            
+            #4. Draw a think border between slot messages and regular messages 
             pen = wx.Pen('green',4)
             dc.SetPen(pen)
             dc.DrawLine(x+2,y+size[2]+size[0]*size[2]+2,x+WindowWidth-3,y+size[2]+size[0]*size[2]+2)
-            #3. Draw a thick border including a thin title ba\
-            #4. Draw a think border between slot messages and regular messages 
             #5. Color alternating message boxes in a grey color
             #6. Draw messages in black over the background
             brush = wx.Brush('grey')
