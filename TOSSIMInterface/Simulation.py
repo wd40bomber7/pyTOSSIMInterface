@@ -245,18 +245,20 @@ class SimScript(object):
         #Try to build the list. May throw exceptions
         self.injectList = list()
         scriptIterator = iter(self.script.splitlines())
+        iterator = 0
         for line in scriptIterator:
-            self.__buildLine(line)
+            iterator += 1
+            self.__buildLine(line,iterator)
         
-    def __buildLine(self,line):
+    def __buildLine(self,line,lineNumber):
         #First double check you have the minimum space count
         splitBySpaces = re.findall("\w+",line)
         if len(splitBySpaces) < 2:
-            raise Exception("Incorrect number of segments. (Missing spaces)")
+            raise Exception("Incorrect number of segments. (Missing spaces) ["+str(lineNumber)+"]")
         #Now check for minimum colons
         splitByColon = line.split(':')
         if len(splitByColon) < 3:
-            raise Exception("Incorrect number of segments[" + str(len(splitByColon)) + "]. (Missing colons)")
+            raise Exception("Incorrect number of segments[" + str(len(splitByColon)) + "]. (Missing colons) ["+lineNumber+"]")
         
         issueAtTime = int(splitByColon[0])
         if issueAtTime < 0:

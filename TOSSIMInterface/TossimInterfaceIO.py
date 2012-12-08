@@ -53,7 +53,7 @@ class InterfaceIO(object):
             line = self.p.stdout.readline()
             if len(line) == 0:
                 break;
-            self.sim.simulationState.ioQueues.QueueInput(line.rstrip());
+            self.sim.simulationState.ioQueues.QueueInput(line.strip());
             #print "RECEIVED: " + line.rstrip();
         print "stopped reading"
     def __handleOutput(self):
@@ -79,6 +79,8 @@ class InterfaceIO(object):
             else:
                 sleepTime = max(1.0/100.0,sleepTime/1.3)
                 for line in lines:
+                    if len(line) <= 0:
+                        continue
                     if line[0] != "_":
                         try:
                             self.sim.simulationState.messages.ParseAndAppend(line);

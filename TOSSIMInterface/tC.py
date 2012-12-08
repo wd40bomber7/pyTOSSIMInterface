@@ -4,13 +4,13 @@ Created on Oct 14, 2012
 @author: wd40bomber7
 '''
 
-guipath = "/home/fire/Desktop/TOSSIMInterface/main.py"
+guipath = "~/TOSSIMInterface/main.py"
 noise = "no_noise.txt"
 topo = "topo.txt"
-channels = "Project2R,Project2RT,Project2F"
+channels = "Project1,Project2,cmdDebug"
 
 
-#Code below this point should not be modified!
+#You usually won't need to modify anything below
 import sys
 import os
 import subprocess
@@ -19,14 +19,14 @@ if len(sys.argv) <= 1:
     noisePath = os.path.abspath(noise);
     myPath = os.path.realpath(__file__)
     p = subprocess.call(["python",guipath,
-                     "--window=output",
+                     "--window=output", #topooutput, inject
                      "--topo=" + topoPath,
                      "--noise=" + noisePath,
                      "--python-child=" + myPath,
                      "--channels=" + channels,
                      "--start"])
     print "[] EXiting!"
-    sys.exit()
+    sys.exit() 
     print "[] What?"
     
 import _TOSSIM
@@ -159,7 +159,7 @@ def handleInput():
             simulationPaused = False
             sys.exit() #Close child
         elif cmd[0] == "Injectpacket":
-            cmdBuffer.append((int(cmd[1]),oCmd[len(cmd[0] + " " + cmd[1]):]))
+            cmdBuffer.append((int(cmd[1]),oCmd[len(cmd[0] + " " + cmd[1] + " "):]))
         
     
 cmdBuffer = collections.deque();
@@ -169,14 +169,18 @@ inputThread.daemon = True
 inputThread.start()
 currentSequence = 9000
 
-
-msg = pack()
-msg.set_seq(9999)
-msg.set_TTL(15)
-msg.set_protocol(99)
-pkt = t.newPacket()
-pkt.setData(msg.data)
-pkt.setType(msg.get_amType())
+def RebuildMessagePack(protocol):
+    global msg
+    global pkt
+    global currentSequence
+    msg = pack()
+    msg.set_seq(currentSequence)
+    msg.set_TTL(15)
+    msg.set_protocol(protocol)
+    pkt = t.newPacket()
+    pkt.setData(msg.data)
+    pkt.setType(msg.get_amType())
+    currentSequence += 1
 
 
 while simulationRunning:
@@ -184,9 +188,7 @@ while simulationRunning:
     cmdQueueProtection.acquire()
     while len(cmdBuffer) > 0:
         cmd = cmdBuffer.popleft()
-        currentSequence += 1
-        msg.set_seq(currentSequence)
-        msg.set_protocol(cmd[0])
+        RebuildMessagePack(cmd[0])
         sendCMD(cmd[1])
     cmdQueueProtection.release()
     while simulationPaused:

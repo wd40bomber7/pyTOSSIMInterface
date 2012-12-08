@@ -13,6 +13,12 @@ import pygraphviz as pgv
 import re
 from Simulation import SimConnection
 
+xxx = dict()
+def pIfChanged(x,tp):
+    global xxx
+    if (not x in xxx) or (xxx[x] != tp):
+        print tp
+        xxx[x] = tp
 
 class TopoOutput(PrimaryFrame.MainWindow):
     '''
@@ -267,12 +273,12 @@ class TopoOutput(PrimaryFrame.MainWindow):
         self.sim.selectedOptions.topoWindowMap[1][self.selectedNode] = (
                         min(max(original[0] + xDelta,0),1),
                         min(max(original[1] + yDelta,0),1),
-                        original[2],original[3],original[4])
+                        original[2],original[3],original[4],original[5],original[6],original[7])
         
         self.selectionLastX = mx
         self.selectionLastY = my
         self.Refresh()
-        print "Attempted move! (" + str(xDelta) + " " + str(yDelta) + ")"
+        #print "Attempted move! (" + str(xDelta) + " " + str(yDelta) + ")"
         
     def __OnMouseLeave(self, event):
         self.selectedNode = None
@@ -427,19 +433,30 @@ class SketchWindow(wx.Panel):
     
     def __findClosestCorner(self,rectangle,point):
         #rectangle is top left x,y, width, height
-        corners = [(rectangle[0],rectangle[1]),
-                   (rectangle[0]+rectangle[2],rectangle[1]),
-                   (rectangle[0],rectangle[1]+rectangle[3]),
-                   (rectangle[0]+rectangle[2],rectangle[1]+rectangle[3])]
+        corners = [(rectangle[0],rectangle[1],0),
+                   (rectangle[0]+rectangle[2],rectangle[1],1),
+                   (rectangle[0],rectangle[1]+rectangle[3],2),
+                   (rectangle[0]+rectangle[2],rectangle[1]+rectangle[3],3)]
         closestCorner = corners[0]
-        closestDistance = 1000000
+        closestDistance = 100000.0
         for corner in corners:
             distance = ((corner[0]-point[0]) ** 2.0 + (corner[1]-point[1]) ** 2.0) ** 0.5
             if distance < closestDistance:
                 closestCorner = corner
                 closestDistance = distance
         return closestCorner
-    
+    #convert the x,y point of one of the corners of a rectangle to the top left corner
+    def __fromPointToTopLeft(self,rectangle,point, cornerNumber):
+        #print "CORNER: " + str(cornerNumber)
+        if cornerNumber == 0:
+            return point
+        if cornerNumber == 1:
+            return (point[0]-rectangle[2],point[1])
+        if cornerNumber == 2:
+            return (point[0],point[1]-rectangle[3])
+        if cornerNumber == 3:
+            return (point[0]-rectangle[2],point[1]-rectangle[3])
+
     def Drawnodes(self,dc):
         self.topoData = self.sim.simulationState.currentTopo
         width,height=self.GetClientSizeTuple()
@@ -486,7 +503,6 @@ class SketchWindow(wx.Panel):
             #1. Break text into lines based off of allowed length
             size = node.myWindow.mapMessagesToLines(dc,WindowWidth)
             totalHeight = ((size[0]+size[1])*size[2]) + size[2] + 4.0 + 4.0
-            #totalHeight = 50
             #2. Calculate boundries if necessary
             if not nodeId in windowPositions:
                 print "Rewrote window positions"
@@ -501,17 +517,31 @@ class SketchWindow(wx.Panel):
                 #print "Node: " + str(nodeId) + " at (" + str(windowPositions[nodeId][0]) + "," + str(windowPositions[nodeId][1]) + ")"
                 x = windowPositions[nodeId][0]*width
                 y = windowPositions[nodeId][1]*height
+                #Convert to top left corner
+                if len(windowPositions[nodeId]) < 8:
+                    cornerNumber = 0
+                else:
+                    cornerNumber = windowPositions[nodeId][7]
+               
+                x,y = self.__fromPointToTopLeft((0,0,WindowWidth,totalHeight),(x,y), cornerNumber)
              
             #Store the % values so resize events are handled gracefully
             ufx = float(x)/width
             ufy = float(y)/height   
+            #Calculate the closest corner for intelligent corners
+            corner = self.__findClosestCorner((ufx,ufy,float(WindowWidth)/width,float(totalHeight)/height),(node.x,node.y))
+            #adjust ufx,ufy for that closest corner
+            ufx = corner[0]
+            ufy = corner[1]
+            closestCorner = corner[2]
+            
             #Now calculate the correct position at the current size
             x = max(x,0)
             y = max(y,0)
             x = min(x,width-WindowWidth)
             y = min(y,height-totalHeight)
             
-            windowPositions[nodeId] = (ufx,ufy,WindowWidth,totalHeight,size,x,y)
+            windowPositions[nodeId] = (ufx,ufy,WindowWidth,totalHeight,size,x,y,closestCorner)
             #Draw a line from the closest corner to the node in question.
             nx = node.x*width
             ny = node.y*height
@@ -522,6 +552,7 @@ class SketchWindow(wx.Panel):
             
             
         for nodeId in self.connectedNodes:
+            node = self.connectedNodes[nodeId]
             #load x,y from options
             x = windowPositions[nodeId][5] #These are stored as % to work properly even on window resize
             y = windowPositions[nodeId][6]

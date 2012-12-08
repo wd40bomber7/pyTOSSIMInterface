@@ -1,105 +1,112 @@
 '''
-Created on Oct 15, 2012
+Created on Oct 12, 2012
 
 @author: wd40bomber7
 '''
+import threading
+import collections
+import unicodedata
 
+class MessageType(object):
+    Error = 0;
+    Debug = 1;
 
-import wx;
-import PrimaryFrame;
-import Simulation
-import io
-import pygraphviz as pgv
-import re
-from Simulation import SimConnection
-
-class TopoWindow(PrimaryFrame.MainWindow):
+class Message(object):
     '''
-    A MDI child class made for displaying output
+    Stores a single message and the details that can be used for filtering it
     '''
 
-    def __init__(self,sim):
+
+    def __init__(self):
         '''
         Constructor
         '''
-        #setup
-        super(TopoWindow,self).__init__(sim,"Topo Edit Window")
-        #Variables
-        self.topoData = None
-
-        #Create menus
-        self.topoFileMenu = wx.Menu()
-        self.nodeMenu = wx.Menu()
-        #Register menus
-        self.RegisterMenu(self.topoFileMenu);
-        #self.RegisterMenu(self.nodeMenu);
-        #Append menus
-        self.menuBar.Append(self.topoFileMenu,"Topo Files")
-        #self.menuBar.Append(self.nodeMenu,"Nodes")
+        self.messageText = "";
+        self.nodeId = 0;
+        self.channelList = []; #one message can have multiple channels
+        self.messageType = MessageType.Debug;
+        self.topoMessage = False;
+        self.topoSlot = -1;
         
-        self.RebuildMenus()
-        
-        self.nodePanel = SketchWindow(self, -1)
-        sizer = wx.BoxSizer(wx.HORIZONTAL)
-        sizer.Add(self.nodePanel,1,wx.EXPAND)
-        self.SetSizer(sizer)
-        self.SetAutoLayout(True)
-        print "Registered panel"
-        #Mouse events for editing
-        self.nodePanel.Bind(wx.EVT_LEFT_DOWN, self.__OnMouseLeftDown, self.nodePanel)
-        self.nodePanel.Bind(wx.EVT_LEFT_UP, self.__OnMouseLeftUp, self.nodePanel)
-        self.nodePanel.Bind(wx.EVT_LEAVE_WINDOW, self.__OnMouseLeave, self.nodePanel)
-        self.nodePanel.Bind(wx.EVT_MOTION, self.__OnMouseMove, self.nodePanel)
-        self.nodePanel.Bind(wx.EVT_RIGHT_DOWN, self.__OnMouseRightClick, self.nodePanel)
-        
-        self.Show();
-        
-
-        
-    def RebuildMenus(self):
+    def ContainsChannelFromList(self,channelList):
         '''
-        Rebuilds the menus of this TopoWindow. 
+        returns true if any of the channels this was broadcasted on is on channelLis
         '''
-        menuBar = super(TopoWindow,self).RebuildMenus();
-        
-        self.topoDict = dict();
-        #Make this an open/save/save as/new menu setup. Open should be a submenu
-        #presetMenu
-        for i in range(len(self.sim.savedPresets.topoHistory)-1,-1,-1):
-            topoFile = self.sim.savedPresets.topoHistory[i]
-            item = self.AddMenuItem(self.topoFileMenu, topoFile, self.__OnTopoSelect)
-            self.topoDict[item.GetId()] = topoFile
-        self.topoFileMenu.AppendSeparator();
-        self.AddMenuItem(self.topoFileMenu, "Browse", self.__OnTopoBrowse)
-        self.AddMenuItem(self.topoFileMenu, "New", self.__OnTopoNew)
-        
-        self.AddMenuItem(self.nodeMenu, "Delete Node", self.__OnNodeRemove)
-        self.AddMenuItem(self.nodeMenu, "Add Node", self.__OnNodeAdd)
-        
-        return menuBar;
-        
-    def WindowType(self):
-        return 3
-    def RelayerTopo(self):
-        '''
-        Determines the draw positions of all nodes
-        '''
-        #First build the graphviz object with the list of connections
-        graph=pgv.AGraph()
-        onlyOneWay = list()
-        for connection in self.topoData.connectionList:
-            firstCheck = connection.fromNode * 1000 + connection.toNode
-            secondCheck = connection.toNode * 1000 + connection.fromNode
-            if (firstCheck in onlyOneWay) or (secondCheck in onlyOneWay):
-                continue;
-            onlyOneWay.append(firstCheck)
-            graph.add_edge(connection.fromNode, connection.toNode)
+        for channel in channelList:
+            if channel in self.channelList:
+                return True;
             
-        graph.node_attr['shape'] = 'point'
-        graph.layout() #Uses neato algorithm to create a node network
+        return False;
+        
+class MessagePool(object):
+    '''
+    Stores up 5000 message objects. Can be filtered on demand
+    '''
+    
+    
+    def __init__(self):
+        '''
+        Constructor
+        '''
+        self.messagesLock = threading.RLock()
+        self.__storedMessages = list(); #collections.deque();
+        #self.__bufferSlider = 0 #Used to fool outsiders into thinking a buffer has infinite depth when it's fixed depth
+    def ClearAll(self):
+        self.__storedMessages = list();
+    def ParseAndAppend(self, unparsedMessage):
+        message = Message();
+        cutup = unparsedMessage.rsplit(" ")
+        if len(cutup) < 3:
+            raise Exception("MalformedMessage0")
+        
+        if cutup[0] == "DEBUG":
+            message.messageType = MessageType.Debug
+        elif cutup[0] == "ERROR":
+            message.messageType = MessageType.Error
+        else:
+            raise Exception("MalformedMessage1")
+        
+        try:
+            message.nodeId = int(cutup[1][1:][:-2]) #Slicing is pretty cool
+        except:
+            raise Exception("MalformedMessage2")
+        
+        message.channelList = cutup[2].rsplit(",");
+        if len(cutup) > 3:
+            message.messageText = unparsedMessage[len(cutup[0])+len(cutup[1])+len(cutup[2])+3:]
+        
+        if len(message.messageText) > 1:
+            if message.messageText[0] == "_":
+                parts = message.messageText.split("_")
+                try:
+                    message.topoSlot = int(parts[1])
+                    message.messageText = message.messageText[len(parts[1])+2:]
+                except:
+                    message.topoSlot = -1
+                
+        #Convert to unicode right now so errors are handled gracefully
+        message.messageText = unicode(message.messageText,errors='replace')
+        self.messagesLock.acquire()
+        #due to buffer mechanic, it is currently infinitly large.
+        #if len(self.__storedMessages) >= 2000: #current max buffer
+            #self.__storedMessages.popleft();
+        self.__storedMessages.append(message)
+        self.messagesLock.release()
+        return message
+        
+    def RetrieveFilteredList(self,allowedTypes,allowedChannels,allowedNodes,readPosition=0):
+        filteredList = list()
+        self.messagesLock.acquire()
+        newReadPosition = len(self.__storedMessages)
+        for i in range(readPosition,newReadPosition) :
+            message = self.__storedMessages[i]
+            if message.messageType in allowedTypes:
+                continue
+            if message.nodeId in allowedNodes:
+                continue
+            if not message.ContainsChannelFromList(allowedChannels):
+                filteredList.append(message);
 
-        #graph.draw("x.png")
-        #graph.draw("x.txt","plain")
-        drawnGraph = graph.draw(None,"plain")
-        #print drawnGraph
-        layoutData = drawnGraph.sp
+        self.messagesLock.release()
+        return (newReadPosition,filteredList)
+        
